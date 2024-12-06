@@ -396,12 +396,14 @@ const DragAndDrop = () => {
   const [boxToDelete, setBoxToDelete] = useState(null); // 삭제할 박스 정보
 
   const days = ['월', '화', '수', '목', '금', '토', '일'];
-  console.log(dealers);
-  console.log(supports);
 
   const getAllCharacter = async () => {
-    const { data } = await axios.get(API.getAllCharacters);
-    console.log(data);
+    const { data } = await axios.get(API.getAllCharacters, {
+      withCredentials: true, // 쿠키/인증 정보 포함
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     data.forEach((el) => {
       const classImg = IMG[el.className];
@@ -430,7 +432,6 @@ const DragAndDrop = () => {
       const { data } = await axios.get(API.getCharater, {
         params: { characterName: nickname }, // 입력된 닉네임을 파라미터로 전송
       });
-      console.log(data);
 
       const { className, level, nickName } = data; // 예시로 서버에서 받은 데이터
 
@@ -474,7 +475,12 @@ const DragAndDrop = () => {
     setIsPopupOpen(true);
   };
 
-  const handleSaveTitle = () => {
+  const handleSaveTitle = async (boxId) => {
+    await axios.post(`${API.updateTitle}/${boxId}`, null, {
+      params: {
+        raidName: newTitle,
+      },
+    });
     setRightBoxes((prev) =>
       prev.map((box) =>
         box.id === selectedBoxId ? { ...box, title: newTitle } : box
@@ -492,7 +498,6 @@ const DragAndDrop = () => {
         },
       })
       .then(({ data }) => {
-        console.log(data);
         setRightBoxes([
           ...rightBoxes,
           {
@@ -515,7 +520,6 @@ const DragAndDrop = () => {
           day: day,
         },
       });
-      console.log(data);
 
       const newBoxes = data.map((item) => ({
         id: item.raidGroupId,
@@ -553,8 +557,6 @@ const DragAndDrop = () => {
       }));
 
       setRightBoxes(newBoxes);
-
-      console.log('박스가 성공적으로 추가되었습니다:', newBoxes);
     } catch (error) {
       console.error('오류 발생:', error);
     }
@@ -959,7 +961,10 @@ const DragAndDrop = () => {
               style={styles.modalInput}
             />
             <div>
-              <button style={styles.modalButton} onClick={handleSaveTitle}>
+              <button
+                style={styles.modalButton}
+                onClick={() => handleSaveTitle(selectedBoxId)}
+              >
                 저장
               </button>
               <button
