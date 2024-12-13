@@ -103,7 +103,6 @@ const styles = {
     borderRadius: '4px',
     marginBottom: '10px',
   },
-
   gridContainer: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr', // 두 개의 항목을 가로로 배치
@@ -127,7 +126,7 @@ const styles = {
     backgroundColor: '#81a1c1',
     borderRadius: '4px',
     padding: '10px',
-    height: '400px',
+    height: '340px',
     gap: '10px', // 딜러와 서포터 공간 사이 간격 추가
   },
   dealerBoxSection: {
@@ -136,6 +135,7 @@ const styles = {
     borderRadius: '4px',
     padding: '5px',
     overflowY: 'auto',
+    height: '220px',
   },
   supportBoxSection: {
     flex: 2, // 서포터 공간 비율
@@ -144,14 +144,6 @@ const styles = {
     padding: '5px',
     overflowY: 'auto',
   },
-  boxTitle: {
-    backgroundColor: '#4c566a',
-    color: 'white',
-    textAlign: 'center',
-    padding: '5px',
-    borderRadius: '4px',
-    marginBottom: '10px',
-  },
   itemContainer: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)', // 한 줄에 2개의 열 생성
@@ -159,31 +151,35 @@ const styles = {
     alignItems: 'start', // 상단 정렬
     justifyItems: 'center', // 아이템 가운데 정렬
     padding: '5px',
+    // height: '100%', // 부모(dealerBoxSection)의 높이를 채움
   },
-  item: {
+  characterItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#88c0d0',
     textAlign: 'center',
     borderRadius: '4px',
     padding: '5px',
-    margin: '5px 0',
-    height: '40px',
-    display: 'flex', // 이미지나 텍스트를 수평으로 배치하려면 flex를 사용
-    alignItems: 'center', // 수직 가운데 정렬
-    justifyContent: 'center', // 수평 가운데 정렬
+    height: '50px',
+    width: '100%', // 부모 컨테이너의 너비에 맞춤
+    boxSizing: 'border-box', // 패딩 포함하여 크기 계산
+    position: 'relative', // 자식 요소(이미지)가 컨테이너 내에서 위치를 기준으로 설정
   },
-  daysContainer: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gridColumn: '1 / -1',
+  characterImage: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    position: 'absolute', // 절대 위치
+    left: '3px', // 왼쪽 구석에서 간격
+  },
+  boxTitle: {
+    backgroundColor: '#4c566a',
+    color: 'white',
+    textAlign: 'center',
+    padding: '5px',
+    borderRadius: '4px',
     marginBottom: '10px',
-    position: 'sticky', // 스크롤 시 고정
-    top: '0', // 상단에 고정
-    zIndex: 1000, // 다른 요소보다 위에 표시
-    backgroundColor: '#444', // 배경색 지정 (고정된 상태에서 배경 유지)
-    padding: '10px 20px',
-    borderBottom: '1px solid #555', // 하단 경계선 추가 (시각적 구분)
-    height: '70px',
   },
   addButton: {
     padding: '10px',
@@ -213,26 +209,6 @@ const styles = {
     borderRadius: '5px',
     width: '60%',
     marginRight: '10px',
-  },
-  characterItem: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#88c0d0',
-    textAlign: 'center',
-    borderRadius: '4px',
-    padding: '5px',
-    height: '50px',
-    width: '100%', // 부모 컨테이너의 너비에 맞춤
-    boxSizing: 'border-box', // 패딩 포함하여 크기 계산
-    position: 'relative', // 자식 요소(이미지)가 컨테이너 내에서 위치를 기준으로 설정
-  },
-  characterImage: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    position: 'absolute', // 절대 위치
-    left: '3px', // 왼쪽 구석에서 간격
   },
   removeButton: {
     backgroundColor: 'red',
@@ -294,20 +270,6 @@ const styles = {
     backgroundColor: '#5e81ac',
     color: 'white',
   },
-  editTitleButton: {
-    backgroundColor: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    marginLeft: '10px',
-    fontSize: '18px', // 이모지가 잘 보이도록 크기 조정
-    padding: '5px',
-    color: '#5e81ac',
-    transition: 'transform 0.2s, color 0.2s',
-  },
-  editTitleButtonHover: {
-    color: '#88c0d0',
-    transform: 'scale(1.2)', // 호버 시 살짝 확대
-  },
   removeBoxButton: {
     position: 'absolute', // 부모 컨테이너의 relative 위치를 기준으로 절대 위치 설정
     right: '10px', // 오른쪽 여백
@@ -321,6 +283,31 @@ const styles = {
     borderRadius: '50%',
     fontSize: '14px',
   },
+  daysAndRaidsContainer: {
+    display: 'flex',
+    flexDirection: 'column', // 수직으로 배치
+    gap: '10px', // 요일과 레이드 간 간격
+    gridColumn: '1 / -1',
+    position: 'sticky', // 상단 고정
+    top: '0', // 상단 위치
+    zIndex: 1000, // 다른 요소 위에 표시
+    backgroundColor: '#444', // 배경색 유지
+    padding: '10px 20px',
+    borderBottom: '1px solid #555', // 구분선
+  },
+  daysContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '10px', // 요일과 레이드 간 간격 추가
+  },
+  raidsContainer: {
+    display: 'flex',
+    justifyContent: 'center', // 버튼을 가운데 정렬
+    alignItems: 'center',
+    gap: '10px', // 레이드 버튼 간 간격
+  },
+
   dayButton: {
     backgroundColor: '#3b4252', // 기본 배경색
     color: '#ffffff', // 텍스트 색상
@@ -341,6 +328,26 @@ const styles = {
     fontWeight: 'bold',
     transform: 'scale(1.1)', // 크기를 살짝 키워 강조
     transition: 'all 0.3s ease', // 부드러운 전환 효과
+  },
+  raidButton: {
+    backgroundColor: '#3b4252',
+    color: '#ffffff',
+    border: '1px solid #5e81ac',
+    borderRadius: '5px',
+    padding: '10px 15px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    transition: 'all 0.3s ease',
+  },
+  activeRaidButton: {
+    backgroundColor: '#88c0d0',
+    color: '#2e3440',
+    border: '1px solid #88c0d0',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    transform: 'scale(1.1)',
+    transition: 'all 0.3s ease',
   },
   characterText: {
     display: 'flex', // 플렉스 컨테이너로 설정
@@ -370,23 +377,21 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
   },
+  selectDropdown: {
+    backgroundColor: '#4c566a',
+    color: '#fff',
+    border: '1px solid #5e81ac',
+    borderRadius: '4px',
+    padding: '5px',
+    marginRight: '10px',
+    cursor: 'pointer',
+  },
 };
 
 const DragAndDrop = () => {
-  const [leftItems, setLeftItems] = useState([]);
-  const [rightBoxes, setRightBoxes] = useState([
-    {
-      id: 'box-1',
-      title: '입력하삼',
-      day: '수',
-      dealers: [],
-      supports: [],
-    },
-  ]);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [selectedBoxId, setSelectedBoxId] = useState(null);
-  const [newTitle, setNewTitle] = useState('');
+  const [rightBoxes, setRightBoxes] = useState([]);
   const [activeDay, setActiveDay] = useState('수'); // 기본 활성화 요일
+  const [selectedRaid, setSelectedRaid] = useState('All'); // 선택된 레이드
   const [nickname, setNickname] = useState(''); // 닉네임 상태 추가
   const [dealers, setDealers] = useState([]);
   const [supports, setSupports] = useState([]);
@@ -395,7 +400,21 @@ const DragAndDrop = () => {
   const [isBoxModalOpen, setIsBoxModalOpen] = useState(false);
   const [boxToDelete, setBoxToDelete] = useState(null); // 삭제할 박스 정보
 
-  const days = ['월', '화', '수', '목', '금', '토', '일'];
+  const days = ['All', '월', '화', '수', '목', '금', '토', '일'];
+
+  const raidTitleOptions = ['All', '노기르', '하기르', '노브', '하브'];
+
+  const raidTimeOptions = [
+    '20:00',
+    '20:30',
+    '21:00',
+    '21:30',
+    '22:00',
+    '22:30',
+    '23:00',
+    '23:30',
+    '24:00',
+  ];
 
   const getAllCharacter = async () => {
     const { data } = await axios.get(API.getAllCharacters, {
@@ -404,6 +423,20 @@ const DragAndDrop = () => {
         'Content-Type': 'application/json',
       },
     });
+
+    const groupedDealers = {
+      '1690+': [],
+      1680: [],
+      1670: [],
+      1660: [],
+    };
+
+    const groupedSupports = {
+      '1690+': [],
+      1680: [],
+      1670: [],
+      1660: [],
+    };
 
     data.forEach((el) => {
       const classImg = IMG[el.className];
@@ -415,42 +448,82 @@ const DragAndDrop = () => {
         classImg,
       };
 
-      // 캐릭터 직업 이름에 따라 딜러/서포트로 분류
+      const level = parseFloat(el.level.replace(/,/g, '')); // 쉼표 제거 후 숫자로 변환
+
+      let levelKey = '1690+';
+      if (level >= 1660 && level < 1670) levelKey = '1660';
+      else if (level >= 1670 && level < 1680) levelKey = '1670';
+      else if (level >= 1680 && level < 1690) levelKey = '1680';
+
+      // 딜러/서포터로 분류
       if (['바드', '도화가', '홀리나이트'].includes(el.className)) {
-        setSupports((prevItems) => [...prevItems, newItem]);
-        setLeftItems((prevItems) => [...prevItems, newItem]);
+        groupedSupports[levelKey].push(newItem);
       } else {
-        setDealers((prevItems) => [...prevItems, newItem]);
-        setLeftItems((prevItems) => [...prevItems, newItem]);
+        groupedDealers[levelKey].push(newItem);
       }
     });
+
+    // 상태 업데이트
+    setDealers(groupedDealers);
+    setSupports(groupedSupports);
   };
 
   // 직업 정보 가져오기
   const getCharacterInfo = async () => {
     try {
       const { data } = await axios.get(API.getCharater, {
-        params: { characterName: nickname }, // 입력된 닉네임을 파라미터로 전송
+        params: { characterName: nickname },
       });
 
-      const { className, level, nickName } = data; // 예시로 서버에서 받은 데이터
+      const { className, level, nickName } = data;
 
       const classImg = IMG[className];
-      // 새로운 아이템 추가
+      const parsedLevel = parseFloat(level.replace(/,/g, '')); // 쉼표 제거 후 숫자로 변환
+
       const newItem = {
-        id: uuidv4(), // 고유한 아이디 생성
+        id: uuidv4(),
         name: nickName,
-        level: level,
+        level: level, // 원본 문자열 유지
+        parsedLevel, // 숫자형 레벨 추가
         className,
         classImg,
       };
 
+      // 레벨 구간 확인
+      let levelKey = '1690+';
+      if (parsedLevel >= 1660 && parsedLevel < 1670) levelKey = '1660';
+      else if (parsedLevel >= 1670 && parsedLevel < 1680) levelKey = '1670';
+      else if (parsedLevel >= 1680 && parsedLevel < 1690) levelKey = '1680';
+
+      // 중복 검사
+      const checkDuplicate = (group) => {
+        return group[levelKey]?.some((item) => item.name === nickName);
+      };
+
+      // 서포터에 추가
       if (['바드', '도화가', '홀리나이트'].includes(className)) {
-        setSupports((prevItems) => [...prevItems, newItem]);
-        setLeftItems((prevItems) => [...prevItems, newItem]);
+        if (!checkDuplicate(supports)) {
+          const updatedSupports = { ...supports };
+          updatedSupports[levelKey] = [
+            ...(updatedSupports[levelKey] || []),
+            newItem,
+          ];
+          setSupports(updatedSupports);
+        } else {
+          alert('이미 존재하는 캐릭터입니다.');
+        }
       } else {
-        setDealers((prevItems) => [...prevItems, newItem]);
-        setLeftItems((prevItems) => [...prevItems, newItem]);
+        // 딜러에 추가
+        if (!checkDuplicate(dealers)) {
+          const updatedDealers = { ...dealers };
+          updatedDealers[levelKey] = [
+            ...(updatedDealers[levelKey] || []),
+            newItem,
+          ];
+          setDealers(updatedDealers);
+        } else {
+          alert('이미 존재하는 캐릭터입니다.');
+        }
       }
     } catch (error) {
       if (
@@ -467,28 +540,8 @@ const DragAndDrop = () => {
 
   useEffect(() => {
     getAllCharacter();
-    getBoxes(activeDay);
+    getBoxes(activeDay, selectedRaid);
   }, []);
-
-  const handleOpenPopup = (boxId) => {
-    setSelectedBoxId(boxId);
-    setIsPopupOpen(true);
-  };
-
-  const handleSaveTitle = async (boxId) => {
-    await axios.post(`${API.updateTitle}/${boxId}`, null, {
-      params: {
-        raidName: newTitle,
-      },
-    });
-    setRightBoxes((prev) =>
-      prev.map((box) =>
-        box.id === selectedBoxId ? { ...box, title: newTitle } : box
-      )
-    );
-    setIsPopupOpen(false);
-    setNewTitle('');
-  };
 
   const addBox = async () => {
     await axios
@@ -502,8 +555,9 @@ const DragAndDrop = () => {
           ...rightBoxes,
           {
             id: data.id,
-            title: '입력하삼',
             day: activeDay,
+            title: null,
+            time: null,
             dealers: [],
             supports: [],
           },
@@ -511,20 +565,23 @@ const DragAndDrop = () => {
       });
   };
 
-  const getBoxes = async (day) => {
+  const getBoxes = async (day, raid) => {
     setActiveDay(day);
+    setSelectedRaid(raid);
 
     try {
       const { data } = await axios.get(API.getRaidGroups, {
         params: {
           day: day,
+          raid: raid,
         },
       });
 
       const newBoxes = data.map((item) => ({
         id: item.raidGroupId,
-        title: item.name || '입력하삼',
+        title: item.name,
         day: item.day,
+        time: item.time,
         dealers: item.characters
           .filter(
             (character) =>
@@ -567,48 +624,57 @@ const DragAndDrop = () => {
   };
 
   // 드래그 종료 시 호출
-  const handleDrop = (e, boxId) => {
+  const handleDrop = async (e, boxId) => {
     const itemId = e.dataTransfer.getData('itemId');
-    const item = leftItems.find((item) => item.id === itemId);
-    const boxIndex = rightBoxes.findIndex((box) => box.id === boxId);
 
-    if (boxIndex !== -1) {
-      const updatedBoxes = [...rightBoxes];
-      const targetBox = updatedBoxes[boxIndex];
-
-      // 중복 검사
-      const isDuplicate =
-        targetBox.dealers.some((existingItem) => existingItem.id === item.id) ||
-        targetBox.supports.some((existingItem) => existingItem.id === item.id);
-
-      if (isDuplicate) {
-        alert('이 아이템은 이미 추가되었습니다.');
-        return;
+    // 그룹화된 딜러 및 서포터 목록에서 아이템 찾기
+    const findItemInGroup = (groupedItems) => {
+      for (const key in groupedItems) {
+        const foundItem = groupedItems[key].find((item) => item.id === itemId);
+        if (foundItem) return foundItem;
       }
+      return null;
+    };
 
-      if (['바드', '도화가', '홀리나이트'].includes(item.className)) {
-        if (targetBox.supports.length >= 2) {
-          alert('서포터 슬롯이 가득 찼습니다.');
-          return;
-        }
-        targetBox.supports.push(item);
-      } else {
-        if (targetBox.dealers.length >= 6) {
-          alert('딜러 슬롯이 가득 찼습니다.');
-          return;
-        }
-        targetBox.dealers.push(item);
-      }
-      axios
-        .post(API.addCharacterToRaidGroup, null, {
-          params: {
-            raidGroupId: boxId,
-            characterName: item.name,
-          },
-        })
-        .then(() => {
+    const item = findItemInGroup(dealers) || findItemInGroup(supports); // 딜러나 서포터 중에서 아이템 찾기
+
+    if (!item) {
+      alert('유효하지 않은 아이템입니다.');
+      return;
+    }
+
+    try {
+      // 서버로 캐릭터 추가 요청
+      const response = await axios.post(API.addCharacterToRaidGroup, null, {
+        params: {
+          raidGroupId: boxId,
+          characterName: item.name,
+        },
+      });
+
+      // 서버 응답이 성공적일 경우, UI 업데이트
+      if (response.status === 200) {
+        const updatedBoxes = [...rightBoxes];
+        const boxIndex = updatedBoxes.findIndex((box) => box.id === boxId);
+
+        if (boxIndex !== -1) {
+          const targetBox = updatedBoxes[boxIndex];
+          if (['바드', '도화가', '홀리나이트'].includes(item.className)) {
+            targetBox.supports.push(item);
+          } else {
+            targetBox.dealers.push(item);
+          }
           setRightBoxes(updatedBoxes);
-        });
+        }
+      }
+    } catch (error) {
+      // 서버에서 중복 등 오류 처리
+      if (error.response) {
+        alert(error.response.data.message || '중복된 캐릭터입니다.');
+      } else {
+        console.error('네트워크 오류:', error);
+        alert('네트워크 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -665,32 +731,75 @@ const DragAndDrop = () => {
   };
 
   const confirmDeleteCharacter = async (id, type, nickName) => {
-    if (characterToDelete) {
-      const { id, type, nickName } = characterToDelete;
+    if (!characterToDelete) return;
 
-      try {
-        await axios.delete(`${API.deleteCharacters}/${nickName}`);
+    const {
+      id: characterId,
+      type: characterType,
+      nickName: characterNickName,
+    } = characterToDelete;
 
-        // 상태 업데이트
-        if (type === 'dealers') {
-          setDealers((prev) => prev.filter((item) => item.id !== id));
-        } else if (type === 'supports') {
-          setSupports((prev) => prev.filter((item) => item.id !== id));
-        }
-      } catch (error) {
-        console.error('캐릭터 삭제 중 오류 발생:', error);
-        alert('캐릭터를 삭제하는 중 오류가 발생했습니다.');
+    try {
+      await axios.delete(`${API.deleteCharacters}/${characterNickName}`);
+
+      // 상태 업데이트
+      if (characterType === 'dealers') {
+        setDealers((prevDealers) => {
+          const updatedDealers = { ...prevDealers };
+          for (const level in updatedDealers) {
+            updatedDealers[level] = updatedDealers[level].filter(
+              (item) => item.id !== characterId
+            );
+          }
+          return updatedDealers;
+        });
+      } else if (characterType === 'supports') {
+        setSupports((prevSupports) => {
+          const updatedSupports = { ...prevSupports };
+          for (const level in updatedSupports) {
+            updatedSupports[level] = updatedSupports[level].filter(
+              (item) => item.id !== characterId
+            );
+          }
+          return updatedSupports;
+        });
       }
+    } catch (error) {
+      console.error('캐릭터 삭제 중 오류 발생:', error);
+      alert('캐릭터를 삭제하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsModalOpen(false);
+      setCharacterToDelete(null);
     }
-
-    // 모달 닫기
-    setIsModalOpen(false);
-    setCharacterToDelete(null);
   };
 
   const openDeleteModal = (id, type, nickName) => {
     setCharacterToDelete({ id, type, nickName }); // 삭제 대상 설정
     setIsModalOpen(true); // 모달 열기
+  };
+
+  const handleTitleChange = (boxId, newTitle) => {
+    setRightBoxes((prevBoxes) =>
+      prevBoxes.map((box) =>
+        box.id === boxId ? { ...box, title: newTitle } : box
+      )
+    );
+
+    axios.post(`${API.updateTitle}/${boxId}`, null, {
+      params: { raidName: newTitle },
+    });
+  };
+
+  const handleTimeChange = (boxId, newTime) => {
+    setRightBoxes((prevBoxes) =>
+      prevBoxes.map((box) =>
+        box.id === boxId ? { ...box, time: newTime } : box
+      )
+    );
+
+    axios.post(`${API.updateTime}/${boxId}`, null, {
+      params: { raidTime: newTime },
+    });
   };
 
   return (
@@ -713,119 +822,175 @@ const DragAndDrop = () => {
         {/* 딜러 섹션 */}
         <div style={styles.dealerSection}>
           <div style={styles.sectionTitle}>딜러</div>
-          <div style={styles.itemContainer}>
-            {dealers.map((item) => (
-              <div
-                key={item.id}
-                style={styles.characterItem}
-                draggable
-                onDragStart={(e) => handleDragStart(e, item.id)}
-              >
-                <button
-                  onClick={() => openDeleteModal(item.id, 'dealers', item.name)}
-                  style={styles.removeButton}
-                >
-                  x
-                </button>
-                <img
-                  src={item.classImg}
-                  alt="character"
-                  style={styles.characterImage}
-                />
-                <div style={styles.characterText}>
-                  {item.name}
-                  <br />
-                  {item.level}
+          {Object.entries(dealers)
+            .sort((a, b) => {
+              const levels = ['1660', '1670', '1680', '1690+'];
+              return levels.indexOf(b[0]) - levels.indexOf(a[0]); // 역순 정렬
+            })
+            .map(([range, items]) => (
+              <div key={range}>
+                <h4 style={{ color: 'white', marginBottom: '10px' }}>
+                  {range}
+                </h4>
+                <div style={styles.itemContainer}>
+                  {items.map((item) => (
+                    <div
+                      key={item.id}
+                      style={styles.characterItem}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, item.id)}
+                    >
+                      <button
+                        onClick={() =>
+                          openDeleteModal(item.id, 'dealers', item.name)
+                        }
+                        style={styles.removeButton}
+                      >
+                        x
+                      </button>
+                      <img
+                        src={item.classImg}
+                        alt="character"
+                        style={styles.characterImage}
+                      />
+                      <div style={styles.characterText}>
+                        {item.name}
+                        <br />
+                        {item.level}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
-          </div>
         </div>
 
         {/* 서포트 섹션 */}
         <div style={styles.supportSection}>
           <div style={styles.sectionTitle}>서포터</div>
-          <div style={styles.itemContainer}>
-            {supports.map((item) => (
-              <div
-                key={item.id}
-                style={styles.characterItem}
-                draggable
-                onDragStart={(e) => handleDragStart(e, item.id)}
-              >
-                <button
-                  onClick={() =>
-                    openDeleteModal(item.id, 'supports', item.name)
-                  }
-                  style={styles.removeButton}
-                >
-                  x
-                </button>
-                <img
-                  src={item.classImg}
-                  alt="character"
-                  style={styles.characterImage}
-                />
-                <div style={styles.characterText}>
-                  {item.name}
-                  <br />
-                  {item.level}
+          {Object.entries(supports)
+            .sort((a, b) => {
+              const levels = ['1660', '1670', '1680', '1690+'];
+              return levels.indexOf(b[0]) - levels.indexOf(a[0]); // 역순 정렬
+            })
+            .map(([range, items]) => (
+              <div key={range}>
+                <h4 style={{ color: 'white', marginBottom: '10px' }}>
+                  {range}
+                </h4>
+                <div style={styles.itemContainer}>
+                  {items.map((item) => (
+                    <div
+                      key={item.id}
+                      style={styles.characterItem}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, item.id)}
+                    >
+                      <button
+                        onClick={() =>
+                          openDeleteModal(item.id, 'supports', item.name)
+                        }
+                        style={styles.removeButton}
+                      >
+                        x
+                      </button>
+                      <img
+                        src={item.classImg}
+                        alt="character"
+                        style={styles.characterImage}
+                      />
+                      <div style={styles.characterText}>
+                        {item.name}
+                        <br />
+                        {item.level}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
-          </div>
         </div>
       </div>
+      {/* ========================================================================================== */}
 
       {/* 가운데 영역 */}
       <div style={styles.gridContainer}>
-        <div style={styles.daysContainer}>
-          <div style={{ flex: 0.1 }}></div>
+        <div style={styles.daysAndRaidsContainer}>
+          {/* 요일 버튼 */}
+          <div style={styles.daysContainer}>
+            <div style={{ flex: 0.1 }}></div>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              {days.map((day) => (
+                <button
+                  key={day}
+                  onClick={() => getBoxes(day, selectedRaid)}
+                  style={{
+                    ...styles.dayButton,
+                    ...(activeDay === day ? styles.activeDayButton : {}),
+                  }}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
+            <button onClick={addBox} style={styles.addButton}>
+              +
+            </button>
+          </div>
 
-          <div style={{ display: 'flex', gap: '5px' }}>
-            {days.map((day) => (
+          {/* 레이드 버튼 */}
+          <div style={styles.raidsContainer}>
+            {raidTitleOptions.map((raid) => (
               <button
-                key={day}
-                onClick={() => getBoxes(day)}
+                key={raid}
+                onClick={() => getBoxes(activeDay, raid)}
                 style={{
-                  ...styles.dayButton,
-                  ...(activeDay === day
-                    ? { backgroundColor: '#88c0d0', color: 'white' }
-                    : {}),
+                  ...styles.raidButton,
+                  ...(selectedRaid === raid ? styles.activeRaidButton : {}),
                 }}
               >
-                {day}
+                {raid}
               </button>
             ))}
           </div>
-          <button onClick={addBox} style={styles.addButton}>
-            +
-          </button>
         </div>
 
         {rightBoxes
-          .filter((box) => box.day === activeDay)
+          .filter(
+            (box) =>
+              (activeDay === 'All' || box.day === activeDay) &&
+              (selectedRaid === 'All' || box.title === selectedRaid)
+          )
           .map((box) => (
             <div key={box.id} style={styles.rightBox}>
+              {/* 제목과 시간 드롭다운 */}
               <div style={styles.sectionTitle}>
-                {box.title}
-                <button
-                  onClick={() => handleOpenPopup(box.id)}
-                  style={{
-                    ...styles.editTitleButton,
-                    ...(isPopupOpen && styles.editTitleButtonHover),
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'scale(1.2)';
-                    e.target.style.color = '#88c0d0';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'scale(1)';
-                    e.target.style.color = '#5e81ac';
-                  }}
+                <select
+                  value={box.title || '레이드 선택'}
+                  onChange={(e) => handleTitleChange(box.id, e.target.value)}
+                  style={styles.selectDropdown}
                 >
-                  ✏️
-                </button>
+                  <option disabled>레이드 선택</option>
+                  {raidTitleOptions.map((title) => (
+                    <option key={title} value={title}>
+                      {title}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={box.time || '시간 선택'}
+                  onChange={(e) => handleTimeChange(box.id, e.target.value)}
+                  style={styles.selectDropdown}
+                >
+                  <option disabled>시간 선택</option>
+                  {raidTimeOptions.map((time) => (
+                    <option key={time} value={time}>
+                      {time}
+                    </option>
+                  ))}
+                </select>
+
                 <button
                   onClick={() => openBoxDeleteModal(box.id)} // 박스 삭제 모달 열기
                   style={styles.removeBoxButton}
@@ -940,36 +1105,6 @@ const DragAndDrop = () => {
                   setIsBoxModalOpen(false);
                   setBoxToDelete(null); // 모달 닫기
                 }}
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 팝업 모달 */}
-      {isPopupOpen && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3>제목 수정</h3>
-            <input
-              type="text"
-              placeholder="새 제목 입력"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              style={styles.modalInput}
-            />
-            <div>
-              <button
-                style={styles.modalButton}
-                onClick={() => handleSaveTitle(selectedBoxId)}
-              >
-                저장
-              </button>
-              <button
-                style={{ ...styles.modalButton, backgroundColor: 'red' }}
-                onClick={() => setIsPopupOpen(false)}
               >
                 취소
               </button>

@@ -12,4 +12,5 @@ export const API = {
   deleteCharactersFromRaid: url + '/raid/character',
   addCharacterToRaidGroup: url + '/raid/character',
   updateTitle: url + '/raid/name',
+  updateTime: url + '/raid/time',
 };
