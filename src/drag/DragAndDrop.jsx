@@ -28,6 +28,7 @@ import 인파이터 from '../img/인파이터.png';
 import 창술사 from '../img/창술사.png';
 import 호크아이 from '../img/호크아이.png';
 import 홀리나이트 from '../img/홀리나이트.png';
+import 환수사 from '../img/환수사.png';
 
 const IMG = {
   브레이커: 브레이커,
@@ -56,6 +57,7 @@ const IMG = {
   호크아이: 호크아이,
   창술사: 창술사,
   홀리나이트: 홀리나이트,
+  환수사: 환수사,
 };
 
 const styles = {
@@ -386,6 +388,17 @@ const styles = {
     marginRight: '10px',
     cursor: 'pointer',
   },
+  dayDisplay: {
+    marginLeft: '10px', // 시간 선택 오른쪽 여백
+    fontSize: '14px', // 텍스트 크기
+    color: '#ffffff', // 텍스트 색상
+    padding: '5px 10px', // 내부 여백
+    backgroundColor: '#5e81ac', // 배경색
+    borderRadius: '5px', // 둥근 테두리
+    fontWeight: 'bold', // 굵은 글씨
+    display: 'inline-block', // 인라인 블록으로 표시
+    marginRight: '10px',
+  },
 };
 
 const DragAndDrop = () => {
@@ -405,6 +418,18 @@ const DragAndDrop = () => {
   const raidTitleOptions = ['All', '노기르', '하기르', '노브', '하브'];
 
   const raidTimeOptions = [
+    '14:00',
+    '14:30',
+    '15:00',
+    '15:30',
+    '16:00',
+    '16:30',
+    '17:00',
+    '17:30',
+    '18:00',
+    '18:30',
+    '19:00',
+    '19:30',
     '20:00',
     '20:30',
     '21:00',
@@ -965,6 +990,9 @@ const DragAndDrop = () => {
             <div key={box.id} style={styles.rightBox}>
               {/* 제목과 시간 드롭다운 */}
               <div style={styles.sectionTitle}>
+                {/* 요일 표시 */}
+                <div style={styles.dayDisplay}>{box.day}</div>
+
                 <select
                   value={box.title || '레이드 선택'}
                   onChange={(e) => handleTitleChange(box.id, e.target.value)}
@@ -1013,7 +1041,7 @@ const DragAndDrop = () => {
                         alt="character"
                         style={styles.characterImage}
                       />
-                      <div>
+                      <div style={styles.characterText}>
                         {item.name}
                         <br />
                         {item.level}
@@ -1046,7 +1074,7 @@ const DragAndDrop = () => {
                         alt="character"
                         style={styles.characterImage}
                       />
-                      <div>
+                      <div style={styles.characterText}>
                         {item.name}
                         <br />
                         {item.level}
