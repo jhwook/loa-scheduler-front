@@ -13,4 +13,5 @@ export const API = {
   addCharacterToRaidGroup: url + '/raid/character',
   updateTitle: url + '/raid/name',
   updateTime: url + '/raid/time',
+  updateDay: url + '/raid/day',
 };

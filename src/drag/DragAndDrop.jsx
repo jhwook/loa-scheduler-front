@@ -399,6 +399,20 @@ const styles = {
     display: 'inline-block', // 인라인 블록으로 표시
     marginRight: '10px',
   },
+  dayOption: {
+    padding: '5px',
+    cursor: 'pointer',
+    border: 'none',
+    backgroundColor: '#5e81ac', // 배경색
+  },
+  dayDropdown: {
+    display: 'flex',
+    flexDirection: 'row',
+    background: '#f9f9f9',
+    position: 'absolute',
+    zIndex: 1,
+    border: '1px solid #ccc',
+  },
 };
 
 const DragAndDrop = () => {
@@ -415,7 +429,17 @@ const DragAndDrop = () => {
 
   const days = ['All', '월', '화', '수', '목', '금', '토', '일'];
 
-  const raidTitleOptions = ['All', '노기르', '하기르', '노브', '하브'];
+  const [showDayOptions, setShowDayOptions] = useState({}); // 특정 박스에 대해 요일 선택 표시 여부
+
+  const raidTitleOptions = [
+    'All',
+    '노기르',
+    '하기르',
+    '노브',
+    '하브',
+    '3막 노말',
+    '3막 하드',
+  ];
 
   const raidTimeOptions = [
     '14:00',
@@ -567,6 +591,10 @@ const DragAndDrop = () => {
     getAllCharacter();
     getBoxes(activeDay, selectedRaid);
   }, []);
+
+  useEffect(() => {
+    getBoxes(activeDay, selectedRaid);
+  }, [rightBoxes]);
 
   const addBox = async () => {
     await axios
@@ -827,6 +855,31 @@ const DragAndDrop = () => {
     });
   };
 
+  const handleDayChange = async (boxId, newDay) => {
+    setRightBoxes((prevBoxes) =>
+      prevBoxes.map((box) =>
+        box.id === boxId ? { ...box, days: newDay } : box
+      )
+    );
+
+    // 서버에 요청 보내기
+    try {
+      await axios.post(`${API.updateDay}/${boxId}`, null, {
+        params: { raidDay: newDay },
+      });
+    } catch (error) {
+      console.error('요일 변경 중 오류 발생:', error);
+      alert('요일 변경 중 문제가 발생했습니다.');
+    }
+  };
+
+  const toggleDayOptions = (boxId) => {
+    setShowDayOptions((prev) => ({
+      ...prev,
+      [boxId]: !prev[boxId],
+    }));
+  };
+
   return (
     <div style={styles.container}>
       {/* 왼쪽 패널 */}
@@ -991,7 +1044,33 @@ const DragAndDrop = () => {
               {/* 제목과 시간 드롭다운 */}
               <div style={styles.sectionTitle}>
                 {/* 요일 표시 */}
-                <div style={styles.dayDisplay}>{box.day}</div>
+                {/* <div style={styles.dayDisplay}>{box.day}</div> */}
+
+                {/* 요일 표시 버튼 */}
+                <div>
+                  <button
+                    onClick={() => toggleDayOptions(box.id)}
+                    style={styles.dayButton}
+                  >
+                    {box.day || '요일 선택'}
+                  </button>
+                  {showDayOptions[box.id] && (
+                    <div style={styles.dayDropdown}>
+                      {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
+                        <button
+                          key={day}
+                          onClick={() => {
+                            handleDayChange(box.id, day); // 요일 변경 핸들러 호출
+                            toggleDayOptions(box.id); // 드롭다운 닫기
+                          }}
+                          style={styles.dayOption}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <select
                   value={box.title || '레이드 선택'}
