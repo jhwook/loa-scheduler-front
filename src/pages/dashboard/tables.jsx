@@ -10,8 +10,20 @@ import {
 } from "@material-tailwind/react";
 import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
 import { authorsTableData, projectsTableData } from "@/data";
+import { useEffect, useState } from "react";
+import { getAllCharacters } from "@/configs/api/request/charactersRequest";
 
+// 내 캐릭 정보
 export function Tables() {
+  const [characters, setCharacters] = useState([]);
+
+  useEffect(() => {
+    const response = getAllCharacters();
+    console.log(response);
+    
+    setCharacters(response);
+  }, []);
+
   return (
     <div className="mt-12 mb-8 flex flex-col gap-12">
       <Card>
