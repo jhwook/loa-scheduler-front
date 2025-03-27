@@ -25,7 +25,7 @@ export const routes = [
       },
       {
         icon: <UserCircleIcon {...icon} />,
-        name: "profile",
+        name: "내 원정대",
         path: "/profile",
         element: <Profile />,
       },
@@ -44,7 +44,7 @@ export const routes = [
     ],
   },
   {
-    title: "auth pages",
+    title: "group spaces",
     layout: "auth",
     pages: [
       {
