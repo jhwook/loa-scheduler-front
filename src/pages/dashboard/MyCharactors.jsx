@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { getAllCharacters } from "@/configs/api/request/charactersRequest";
 
 // 내 캐릭 정보
-export function Tables() {
+export function MyCharactors() {
   const [characters, setCharacters] = useState([]);
 
   useEffect(async() => {
