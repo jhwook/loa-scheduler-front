@@ -4,9 +4,9 @@ export default function MyCharacters() {
   const [characters, setCharacters] = useState([]);
 
   useEffect(() => {
-    // 백엔드에서 사용자 캐릭터 리스트 불러오기 (임시 데이터 예시)
     const dummyData = [
       {
+        // character info
         name: "그만보여줘",
         job: "브레이커",
         level: 1730,
