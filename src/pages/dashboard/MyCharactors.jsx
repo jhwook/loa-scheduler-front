@@ -6,6 +6,7 @@ export default function MyCharacters() {
   useEffect(() => {
     const dummyData = [
       {
+        // character info
         name: "그만보여줘",
         job: "브레이커",
         level: 1730,
