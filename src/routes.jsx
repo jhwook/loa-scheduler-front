@@ -50,6 +50,7 @@ export const routes = [
       },
     ],
   },
+  // Auth routes
   {
     title: "group spaces",
     layout: "auth",
