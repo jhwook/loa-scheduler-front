@@ -17,12 +17,12 @@ import { getAllCharacters } from "@/configs/api/request/charactersRequest";
 export function Tables() {
   const [characters, setCharacters] = useState([]);
 
-  // useEffect(async() => {
-  //   const response = await getAllCharacters();
-  //   console.log(response);
+  useEffect(async () => {
+    const response = await getAllCharacters();
+    console.log(response);
 
-  //   setCharacters(response);
-  // }, []);
+    setCharacters(response);
+  }, []);
 
   return (
     <div className="mt-12 mb-8 flex flex-col gap-12">
