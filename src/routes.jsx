@@ -69,6 +69,25 @@ export const routes = [
       },
     ],
   },
+  // Group routes
+  {
+    title: "group spaces",
+    layout: "auth",
+    pages: [
+      {
+        icon: <ServerStackIcon {...icon} />,
+        name: "sign in",
+        path: "/sign-in",
+        element: <SignIn />,
+      },
+      {
+        icon: <RectangleStackIcon {...icon} />,
+        name: "sign up",
+        path: "/sign-up",
+        element: <SignUp />,
+      },
+    ],
+  },
 ];
 
 export default routes;
