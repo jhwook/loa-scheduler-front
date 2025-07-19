@@ -1,9 +1,11 @@
-import { Card, Input, Checkbox, Button, Typography } from "@material-tailwind/react";
-import { Link } from "react-router-dom";
+import { Input, Button, Typography } from "@material-tailwind/react";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { mainUrl } from "@/configs/api/apiUrl";
 
 export function SignUp() {
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -21,57 +23,46 @@ export function SignUp() {
     }
 
     try {
-      const response = await axios.post("/auth/signup", {
+      const response = await axios.post(`${mainUrl}/auth/signup`, {
         username,
         password,
       });
 
-      if (response.ok) {
-        alert("회원가입 성공!");
-        navigate("/auth/sign-in");
-      } else {
-        const error = await response.json();
-        alert("회원가입 실패: " + error.message);
-      }
+      alert("회원가입 성공!");
+      navigate("/auth/sign-in");
     } catch (err) {
       alert("에러 발생: " + err.message);
     }
   };
 
   return (
-    <section className="m-8 flex">
-      <div className="w-2/5 h-full hidden lg:block">
-        <img src="/img/pattern.png" className="h-full w-full object-cover rounded-3xl" />
-      </div>
-      <div className="w-full lg:w-3/5 flex flex-col items-center justify-center">
+    <section className="min-h-screen flex items-center justify-center">
+      <div className="w-full max-w-md">
         <div className="text-center">
           <Typography variant="h2" className="font-bold mb-4">
             Sign Up
           </Typography>
           <Typography variant="paragraph" color="blue-gray" className="text-lg font-normal">
-            Enter your email and password to register.
+            Enter your ID and password to register.
           </Typography>
         </div>
-        <form className="mt-8 mb-2 mx-auto w-80 max-w-screen-lg lg:w-1/2">
-          <div className="mb-1 flex flex-col gap-6">
+        <form onSubmit={handleRegister} className="mt-8 mb-2 mx-auto">
+          <div className="mb-6 flex flex-col gap-6">
             <div>
-              <Typography variant="small" color="blue-gray" className=" font-medium">
+              <Typography variant="small" color="blue-gray" className="font-medium mb-1">
                 아이디
               </Typography>
               <Input
                 size="lg"
                 placeholder="ID"
                 value={username}
-                className=" !border-t-blue-gray-200 focus:!border-t-gray-900"
-                labelProps={{
-                  className: "before:content-none after:content-none",
-                }}
+                className="!border-t-blue-gray-200 focus:!border-t-gray-900"
                 onChange={(e) => setUsername(e.target.value)}
               />
             </div>
 
             <div>
-              <Typography variant="small" color="blue-gray" className=" font-medium">
+              <Typography variant="small" color="blue-gray" className="font-medium mb-1">
                 비밀번호
               </Typography>
               <Input
@@ -79,16 +70,13 @@ export function SignUp() {
                 placeholder="Password"
                 type="password"
                 value={password}
-                className=" !border-t-blue-gray-200 focus:!border-t-gray-900"
-                labelProps={{
-                  className: "before:content-none after:content-none",
-                }}
+                className="!border-t-blue-gray-200 focus:!border-t-gray-900"
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 
             <div>
-              <Typography variant="small" color="blue-gray" className=" font-medium">
+              <Typography variant="small" color="blue-gray" className="font-medium mb-1">
                 비밀번호 확인
               </Typography>
               <Input
@@ -96,10 +84,7 @@ export function SignUp() {
                 placeholder="Confirm Password"
                 type="password"
                 value={confirmPassword}
-                className=" !border-t-blue-gray-200 focus:!border-t-gray-900"
-                labelProps={{
-                  className: "before:content-none after:content-none",
-                }}
+                className="!border-t-blue-gray-200 focus:!border-t-gray-900"
                 onChange={(e) => {
                   const value = e.target.value;
                   setConfirmPassword(value);
@@ -115,9 +100,9 @@ export function SignUp() {
           </div>
 
           <Button
+            type="submit"
             className="mt-6 text-white"
             fullWidth
-            onClick={handleRegister}
             disabled={!isMatch || !username || !password || !confirmPassword}
             style={{
               cursor:
@@ -134,6 +119,7 @@ export function SignUp() {
               className="flex items-center gap-2 justify-center shadow-md"
               fullWidth
             >
+              {/* Google SVG 그대로 유지 */}
               <svg
                 width="17"
                 height="16"
@@ -167,11 +153,8 @@ export function SignUp() {
               </svg>
               <span>Sign in With Google</span>
             </Button>
-            {/* <Button size="lg" color="white" className="flex items-center gap-2 justify-center shadow-md" fullWidth>
-              <img src="/img/twitter-logo.svg" height={24} width={24} alt="" />
-              <span>Sign in With Twitter</span>
-            </Button> */}
           </div>
+
           <Typography
             variant="paragraph"
             className="text-center text-blue-gray-500 font-medium mt-4"
