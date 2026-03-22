@@ -84,10 +84,10 @@ export default function Sidebar() {
         <ul className="menu w-full bg-transparent p-0 text-sm">
           <li>
             <Link
-              href="/characters"
+              href="/expedition"
               className={
                 itemBaseClasses +
-                (isActive("/characters")
+                (isActive("/expedition")
                   ? " active bg-slate-800/95 text-slate-50"
                   : " text-slate-700 hover:bg-slate-100")
               }
