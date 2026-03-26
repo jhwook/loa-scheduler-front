@@ -101,6 +101,28 @@ export default function Sidebar() {
             </Link>
           </li>
         </ul>
+
+        <p className="menu-title mt-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          관리자
+        </p>
+        <ul className="menu w-full bg-transparent p-0 text-sm">
+          <li>
+            <Link
+              href="/admin/raids"
+              className={
+                itemBaseClasses +
+                (isActive("/admin/raids")
+                  ? " active bg-slate-800/95 text-slate-50"
+                  : " text-slate-700 hover:bg-slate-100")
+              }
+            >
+              <div className="avatar placeholder">
+                <div className="h-9 w-9 rounded-lg bg-slate-100 text-sm">🛠️</div>
+              </div>
+              <span>레이드 관리</span>
+            </Link>
+          </li>
+        </ul>
       </nav>
 
       <div className="mt-6 rounded-xl bg-slate-900/95 p-4 text-xs text-slate-100">

@@ -4,8 +4,14 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useState, type FormEvent } from "react";
 
-import { registerLostarkApiKey } from "@/lib/api/users";
-import { getHasApiToken, setHasApiToken } from "@/lib/auth/storage";
+import {
+  getMeHasApiToken,
+  registerLostarkApiKey,
+} from "@/lib/api/users";
+import {
+  getHasApiToken,
+  setHasApiToken,
+} from "@/lib/auth/storage";
 import { ApiError } from "@/types/api";
 
 /**
@@ -28,9 +34,28 @@ export function LostarkApiKeyRegisterButton() {
   } | null>(null);
 
   useEffect(() => {
-    setHasApiTokenState(getHasApiToken());
-    setReady(true);
-    setMounted(true);
+    let alive = true;
+
+    async function syncHasApiToken() {
+      setMounted(true);
+      try {
+        const remoteHasApiToken = await getMeHasApiToken();
+        if (!alive) return;
+        setHasApiToken(remoteHasApiToken);
+        setHasApiTokenState(remoteHasApiToken);
+      } catch {
+        if (!alive) return;
+        setHasApiTokenState(getHasApiToken());
+      } finally {
+        if (alive) setReady(true);
+      }
+    }
+
+    syncHasApiToken();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function onSubmit(e: FormEvent) {
@@ -92,7 +117,7 @@ export function LostarkApiKeyRegisterButton() {
               setOpen(true);
               setValidationError(null);
             }}
-            className="btn btn-sm rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-800 shadow-sm hover:bg-slate-50 md:btn-md md:text-sm"
+            className="btn btn-outline btn-sm border-slate-300 bg-white text-slate-700"
           >
             API KEY 등록
           </button>

@@ -62,8 +62,12 @@ export function ExpeditionMyCharacterList() {
       void load();
     };
     window.addEventListener("expedition-characters-synced", refresh);
+    window.addEventListener("character-weekly-raids-synced", refresh);
     return () =>
-      window.removeEventListener("expedition-characters-synced", refresh);
+      {
+        window.removeEventListener("expedition-characters-synced", refresh);
+        window.removeEventListener("character-weekly-raids-synced", refresh);
+      };
   }, [load]);
 
   const grouped = useMemo(() => groupByServerSorted(rows), [rows]);
@@ -118,7 +122,7 @@ export function ExpeditionMyCharacterList() {
             {serverName}{" "}
             <span className="font-normal text-slate-400">({chars.length})</span>
           </h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
             {chars.map((c) => (
               <ExpeditionCharacterCard key={c.id} character={c} />
             ))}

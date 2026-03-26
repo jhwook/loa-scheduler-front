@@ -2,3 +2,18 @@
 export type RegisterLostarkApiKeyRequest = {
   apiKey: string;
 };
+
+export type MeResponse = {
+  id?: number;
+  username?: string;
+  hasApiToken?: boolean | string | number | null;
+  role?: string;
+  roles?: string[];
+  isAdmin?: boolean;
+  user?: {
+    role?: string;
+    roles?: string[];
+    isAdmin?: boolean;
+    hasApiToken?: boolean | string | number | null;
+  };
+};

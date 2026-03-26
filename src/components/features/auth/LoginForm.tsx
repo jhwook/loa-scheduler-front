@@ -9,6 +9,7 @@ import {
   getAccessToken,
   setAccessToken,
   setHasApiToken,
+  setLostarkApiToken,
 } from "@/lib/auth/storage";
 import { ApiError } from "@/types/api";
 
@@ -44,12 +45,13 @@ export function LoginForm() {
 
     setPending(true);
     try {
-      const { accessToken, hasApiToken } = await loginApi({
+      const { accessToken, hasApiToken, lostarkApiToken } = await loginApi({
         username: id,
         password: pw,
       });
       setAccessToken(accessToken);
       setHasApiToken(hasApiToken);
+      setLostarkApiToken(lostarkApiToken ?? null);
       router.replace("/expedition");
       router.refresh();
     } catch (err) {

@@ -1,4 +1,8 @@
-import { AUTH_TOKEN_STORAGE_KEY, HAS_API_TOKEN_STORAGE_KEY } from "@/lib/constants";
+import {
+  AUTH_TOKEN_STORAGE_KEY,
+  HAS_API_TOKEN_STORAGE_KEY,
+  LOSTARK_API_TOKEN_STORAGE_KEY,
+} from "@/lib/constants";
 
 function isBrowser(): boolean {
   return typeof window !== "undefined";
@@ -30,9 +34,24 @@ export function setHasApiToken(value: boolean): void {
   window.localStorage.setItem(HAS_API_TOKEN_STORAGE_KEY, value ? "true" : "false");
 }
 
+export function getLostarkApiToken(): string | null {
+  if (!isBrowser()) return null;
+  return window.localStorage.getItem(LOSTARK_API_TOKEN_STORAGE_KEY);
+}
+
+export function setLostarkApiToken(value: string | null): void {
+  if (!isBrowser()) return;
+  if (value && value.trim()) {
+    window.localStorage.setItem(LOSTARK_API_TOKEN_STORAGE_KEY, value.trim());
+    return;
+  }
+  window.localStorage.removeItem(LOSTARK_API_TOKEN_STORAGE_KEY);
+}
+
 /** 토큰·hasApiToken 플래그 함께 제거 (로그아웃 등) */
 export function clearAuthStorage(): void {
   if (!isBrowser()) return;
   window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
   window.localStorage.removeItem(HAS_API_TOKEN_STORAGE_KEY);
+  window.localStorage.removeItem(LOSTARK_API_TOKEN_STORAGE_KEY);
 }

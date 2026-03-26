@@ -75,7 +75,7 @@ function ServerSelectAllCheckbox({
     <input
       ref={ref}
       type="checkbox"
-      className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-slate-600 accent-slate-800"
+      className="checkbox checkbox-sm checkbox-neutral h-5 w-5 shrink-0 border-slate-600"
       checked={allSelected}
       onChange={onToggle}
       title={
@@ -348,7 +348,7 @@ export function ExpeditionPreviewModal({ open, onClose }: Props) {
                     <div className="flex min-w-0 items-center gap-1.5">
                       <button
                         type="button"
-                        className="flex h-8 min-h-8 w-8 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-base font-bold text-slate-700"
+                        className="btn btn-ghost btn-xs h-8 min-h-8 w-8 shrink-0 px-0 text-base font-bold text-slate-700"
                         aria-expanded={!collapsed}
                         aria-label={
                           collapsed
@@ -394,7 +394,7 @@ export function ExpeditionPreviewModal({ open, onClose }: Props) {
                           >
                             <input
                               type="checkbox"
-                              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-slate-600 accent-slate-800"
+                              className="checkbox checkbox-sm checkbox-neutral mt-0.5 h-5 w-5 shrink-0 border-slate-600"
                               checked={on}
                               onChange={(e) => toggle(key, e.target.checked)}
                             />
