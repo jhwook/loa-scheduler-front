@@ -62,12 +62,9 @@ export function ExpeditionMyCharacterList() {
       void load();
     };
     window.addEventListener("expedition-characters-synced", refresh);
-    window.addEventListener("character-weekly-raids-synced", refresh);
-    return () =>
-      {
-        window.removeEventListener("expedition-characters-synced", refresh);
-        window.removeEventListener("character-weekly-raids-synced", refresh);
-      };
+    return () => {
+      window.removeEventListener("expedition-characters-synced", refresh);
+    };
   }, [load]);
 
   const grouped = useMemo(() => groupByServerSorted(rows), [rows]);

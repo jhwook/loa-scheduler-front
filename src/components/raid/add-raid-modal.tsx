@@ -1,15 +1,17 @@
 'use client';
 
+import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
   createCharacterWeeklyRaids,
+  getCharacterWeeklyRaids,
   getRaidInfoDetail,
   getRaidInfos,
 } from '@/lib/api/raid';
 import { ApiError } from '@/types/api';
-import type { RaidDetail, RaidSimple } from '@/types/raid';
+import type { CharacterWeeklyRaidItem, RaidDetail, RaidSimple } from '@/types/raid';
 
 import { RaidDifficultySection } from './raid-difficulty-section';
 
@@ -27,6 +29,7 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
   const [raids, setRaids] = useState<RaidSimple[]>([]);
   const [raidId, setRaidId] = useState<number | null>(null);
   const [detail, setDetail] = useState<RaidDetail | null>(null);
+  const [registeredRows, setRegisteredRows] = useState<CharacterWeeklyRaidItem[]>([]);
   const [selection, setSelection] = useState<SelectionState>({});
   const [loadingList, setLoadingList] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -44,10 +47,23 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
       setLoadingList(true);
       setError(null);
       try {
-        const list = await getRaidInfos();
+        const [list, registered] = await Promise.all([
+          getRaidInfos(),
+          getCharacterWeeklyRaids(characterId),
+        ]);
         if (!alive) return;
-        setRaids(list);
-        setRaidId((prev) => prev ?? list[0]?.id ?? null);
+        setRegisteredRows(registered);
+
+        const registeredRaidIds = new Set(
+          registered.map((row) => row.raidGateInfo.raidInfo.id),
+        );
+        const filtered = list.filter((r) => !registeredRaidIds.has(r.id));
+
+        setRaids(filtered);
+        setRaidId((prev) => {
+          if (prev && filtered.some((r) => r.id === prev)) return prev;
+          return filtered[0]?.id ?? null;
+        });
       } catch (err) {
         if (!alive) return;
         const msg =
@@ -65,18 +81,33 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
     return () => {
       alive = false;
     };
-  }, [open]);
+  }, [open, characterId]);
 
   useEffect(() => {
     if (!open || !raidId) return;
+    const selectedRaidId = raidId;
     let alive = true;
     async function loadDetail() {
       setLoadingDetail(true);
       setError(null);
       try {
-        const d = await getRaidInfoDetail(raidId);
+        const d = await getRaidInfoDetail(selectedRaidId);
         if (!alive) return;
-        setDetail(d);
+        const registeredGateIds = new Set(
+          registeredRows.map((row) => row.raidGateInfoId),
+        );
+        const filteredDetail: RaidDetail = {
+          ...d,
+          difficulties: d.difficulties
+            .map((section) => ({
+              ...section,
+              gates: section.gates.filter(
+                (gate) => !registeredGateIds.has(gate.raidGateInfoId),
+              ),
+            }))
+            .filter((section) => section.gates.length > 0),
+        };
+        setDetail(filteredDetail);
         setSelection({});
       } catch (err) {
         if (!alive) return;
@@ -95,7 +126,7 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
     return () => {
       alive = false;
     };
-  }, [open, raidId]);
+  }, [open, raidId, registeredRows]);
 
   const allSelected = useMemo(
     () =>
@@ -107,6 +138,17 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
         })),
     [selection]
   );
+
+  const gateNoByGateId = useMemo(() => {
+    const map = new Map<number, number>();
+    if (!detail) return map;
+    for (const section of detail.difficulties) {
+      for (const gate of section.gates) {
+        map.set(gate.raidGateInfoId, gate.gateNumber);
+      }
+    }
+    return map;
+  }, [detail]);
 
   async function handleSave() {
     if (allSelected.length === 0) {
@@ -134,20 +176,30 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
     }
   }
 
-  if (!open || !mounted) return null;
+  if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-slate-900/70"
-        aria-label="닫기"
-        onClick={onClose}
-      />
-      <div
-        className="relative z-10 flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <AnimatePresence>
+      {open ? (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          <motion.button
+            type="button"
+            className="absolute inset-0 bg-slate-900/70"
+            aria-label="닫기"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          />
+          <motion.div
+            className="relative z-10 flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
         <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
           <div>
             <h3 className="text-2xl font-bold">레이드 숙제 등록</h3>
@@ -165,22 +217,28 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-          <div className="max-w-xs">
-            <select
-              className="select select-bordered w-full border-slate-600 bg-slate-800 text-slate-100"
-              disabled={loadingList}
-              value={raidId ?? ''}
-              onChange={(e) => setRaidId(Number(e.target.value))}
-            >
-              <option value="" disabled>
-                레이드 선택
-              </option>
-              {raids.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.raidName}
-                </option>
-              ))}
-            </select>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-slate-300">레이드 선택</p>
+            <div className="flex flex-wrap gap-2">
+              {raids.map((r) => {
+                const selected = raidId === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    disabled={loadingList}
+                    onClick={() => setRaidId(r.id)}
+                    className={`btn btn-sm rounded-full ${
+                      selected
+                        ? "btn-primary"
+                        : "border border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                    }`}
+                  >
+                    {r.raidName}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {loadingDetail ? (
@@ -189,37 +247,54 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
             </div>
           ) : detail ? (
             <div className="space-y-5">
-              {detail.difficulties.map((section) => (
-                <RaidDifficultySection
-                  key={section.difficulty}
-                  section={section}
-                  values={selection}
-                  onToggleSelected={(gateId, selected) =>
-                    setSelection((prev) => ({
-                      ...prev,
-                      [gateId]: {
-                        selected,
-                        extra: selected
-                          ? (prev[gateId]?.extra ?? false)
-                          : false,
-                      },
-                    }))
-                  }
-                  onToggleExtra={(gateId, extra) =>
-                    setSelection((prev) => ({
-                      ...prev,
-                      [gateId]: {
-                        selected: prev[gateId]?.selected ?? false,
-                        extra,
-                      },
-                    }))
-                  }
-                />
-              ))}
+              {detail.difficulties.length > 0 ? (
+                detail.difficulties.map((section) => (
+                  <RaidDifficultySection
+                    key={section.difficulty}
+                    section={section}
+                    values={selection}
+                    onToggleSelected={(gateId, selected) =>
+                      setSelection((prev) => {
+                        const next: SelectionState = { ...prev };
+                        const gateNo = gateNoByGateId.get(gateId);
+
+                        if (selected && gateNo !== undefined) {
+                          for (const [id, no] of gateNoByGateId.entries()) {
+                            if (no === gateNo && id !== gateId) {
+                              next[id] = { selected: false, extra: false };
+                            }
+                          }
+                        }
+
+                        next[gateId] = {
+                          selected,
+                          extra: selected ? (prev[gateId]?.extra ?? false) : false,
+                        };
+                        return next;
+                      })
+                    }
+                    onToggleExtra={(gateId, extra) =>
+                      setSelection((prev) => ({
+                        ...prev,
+                        [gateId]: {
+                          selected: prev[gateId]?.selected ?? false,
+                          extra,
+                        },
+                      }))
+                    }
+                  />
+                ))
+              ) : (
+                <div className="rounded-lg border border-slate-700 bg-slate-800/60 px-4 py-6 text-center text-sm text-slate-300">
+                  해당 레이드는 이미 모든 관문이 등록되어 있습니다.
+                </div>
+              )}
             </div>
           ) : (
             <div className="py-10 text-center text-slate-300">
-              레이드를 선택해주세요.
+              {raids.length === 0
+                ? '추가 가능한 레이드가 없습니다.'
+                : '레이드를 선택해주세요.'}
             </div>
           )}
           {error ? <div className="alert alert-error">{error}</div> : null}
@@ -235,8 +310,10 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
             {saving ? '등록 중...' : '등록하기'}
           </button>
         </div>
-      </div>
-    </div>,
+          </motion.div>
+        </div>
+      ) : null}
+    </AnimatePresence>,
     document.body
   );
 }

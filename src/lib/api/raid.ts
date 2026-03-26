@@ -10,6 +10,7 @@ import type {
   RaidInfo,
   UpdateRaidRequest,
   UpdateRaidGateRequest,
+  UpdateCharacterWeeklyRaidRequest,
 } from "@/types/raid";
 
 const ADMIN_RAIDS_PATH = "/raid-info/admin/raids";
@@ -126,5 +127,25 @@ export async function getCharacterWeeklyRaids(
 ): Promise<CharacterWeeklyRaidItem[]> {
   return apiFetch<CharacterWeeklyRaidItem[]>(`/characters/${characterId}/weekly-raids`, {
     method: "GET",
+  });
+}
+
+export async function patchCharacterWeeklyRaidClear(
+  id: number,
+  isCleared: boolean,
+): Promise<void> {
+  await apiFetch<unknown>(`/characters/weekly-raids/${id}/clear`, {
+    method: "PATCH",
+    json: { isCleared },
+  });
+}
+
+export async function patchCharacterWeeklyRaid(
+  id: number,
+  payload: UpdateCharacterWeeklyRaidRequest,
+): Promise<void> {
+  await apiFetch<unknown>(`/characters/weekly-raids/${id}`, {
+    method: "PATCH",
+    json: payload,
   });
 }

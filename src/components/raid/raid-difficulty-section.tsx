@@ -13,11 +13,17 @@ type Props = {
   onToggleExtra: (gateId: number, selected: boolean) => void;
 };
 
-function dotColor(difficulty: string): string {
-  if (difficulty.includes("나이트")) return "bg-fuchsia-500";
-  if (difficulty.includes("하드")) return "bg-orange-400";
-  if (difficulty.includes("노말")) return "bg-sky-400";
-  return "bg-slate-400";
+function difficultyBadgeClass(difficulty: string): string {
+  if (difficulty.includes("나메") || difficulty.includes("나이트") || difficulty.includes("3단계")) {
+    return "border-fuchsia-400/70 bg-fuchsia-600 text-white";
+  }
+  if (difficulty.includes("하드") || difficulty.includes("2단계")) {
+    return "border-rose-400/70 bg-rose-600 text-white";
+  }
+  if (difficulty.includes("노말") || difficulty.includes("1단계")) {
+    return "border-slate-500 bg-slate-700 text-white";
+  }
+  return "border-slate-500 bg-slate-700 text-white";
 }
 
 export function RaidDifficultySection({
@@ -29,8 +35,9 @@ export function RaidDifficultySection({
   return (
     <section className="space-y-2.5">
       <h4 className="flex items-center gap-2 text-lg font-semibold text-slate-200">
-        <span className={`inline-block h-3.5 w-3.5 rounded-full ${dotColor(section.difficulty)}`} />
-        {section.difficulty}
+        <span className={`badge badge-sm border ${difficultyBadgeClass(section.difficulty)}`}>
+          {section.difficulty}
+        </span>
       </h4>
       <div className="grid gap-2 sm:grid-cols-2">
         {section.gates.map((gate) => {

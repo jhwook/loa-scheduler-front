@@ -123,3 +123,11 @@ export type CharacterWeeklyRaidItem = {
     };
   };
 };
+
+export type UpdateCharacterWeeklyRaidRequest = {
+  characterId: number;
+  data: {
+    raidGateInfoId: number;
+    isExtraRewardSelected: boolean;
+  };
+};
