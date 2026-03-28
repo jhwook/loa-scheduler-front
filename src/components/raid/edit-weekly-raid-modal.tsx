@@ -5,13 +5,15 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  deleteCharacterWeeklyRaidsByRaid,
   getRaidInfoDetail,
-  patchCharacterWeeklyRaid,
+  putCharacterWeeklyRaids,
 } from "@/lib/api/raid";
 import { ApiError } from "@/types/api";
 import type {
   CharacterWeeklyRaidItem,
   RaidDetail,
+  WeeklyRaidGateSelection,
 } from "@/types/raid";
 
 import { RaidDifficultySection } from "./raid-difficulty-section";
@@ -19,6 +21,8 @@ import { RaidDifficultySection } from "./raid-difficulty-section";
 type Props = {
   open: boolean;
   characterId: number;
+  /** 캐릭터 전체 주간 레이드 (다른 레이드는 PUT 시 유지용) */
+  allWeeklyRows: CharacterWeeklyRaidItem[];
   raidId: number | null;
   raidName: string;
   weeklyRows: CharacterWeeklyRaidItem[];
@@ -31,6 +35,7 @@ type SelectionState = Record<number, { selected: boolean; extra: boolean }>;
 export function EditWeeklyRaidModal({
   open,
   characterId,
+  allWeeklyRows,
   raidId,
   raidName,
   weeklyRows,
@@ -42,11 +47,23 @@ export function EditWeeklyRaidModal({
   const [selection, setSelection] = useState<SelectionState>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmError, setDeleteConfirmError] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setDeleteConfirmOpen(false);
+      setDeleteConfirmError(null);
+    }
+  }, [open]);
 
   const weeklyMap = useMemo(() => {
     const map = new Map<number, CharacterWeeklyRaidItem>();
@@ -135,19 +152,31 @@ export function EditWeeklyRaidModal({
         return;
       }
 
-      const tasks = weeklyRows.map((row) => {
-        const gateNo = row.raidGateInfo.gateNumber;
-        const gateId = selectedByGateNo.get(gateNo) ?? row.raidGateInfoId;
-        const selected = selection[gateId];
-        return patchCharacterWeeklyRaid(row.id, {
-          characterId,
-          data: {
-            raidGateInfoId: gateId,
-            isExtraRewardSelected: selected?.extra ?? false,
-          },
-        });
+      const currentRaidSelections: WeeklyRaidGateSelection[] = [];
+      if (detail && raidId !== null) {
+        for (const section of detail.difficulties) {
+          for (const gate of section.gates) {
+            const state = selection[gate.raidGateInfoId];
+            if (state?.selected) {
+              currentRaidSelections.push({
+                raidGateInfoId: gate.raidGateInfoId,
+                isExtraRewardSelected: Boolean(state.extra),
+              });
+            }
+          }
+        }
+      }
+
+      const otherRaidSelections: WeeklyRaidGateSelection[] = allWeeklyRows
+        .filter((row) => row.raidGateInfo.raidInfo.id !== raidId)
+        .map((row) => ({
+          raidGateInfoId: row.raidGateInfoId,
+          isExtraRewardSelected: row.isExtraRewardSelected,
+        }));
+
+      await putCharacterWeeklyRaids(characterId, {
+        raidGateSelections: [...otherRaidSelections, ...currentRaidSelections],
       });
-      await Promise.all(tasks);
       onSaved();
       onClose();
     } catch (err) {
@@ -163,9 +192,34 @@ export function EditWeeklyRaidModal({
     }
   }
 
+  async function performDelete() {
+    if (raidId === null || weeklyRows.length === 0) return;
+    setDeleting(true);
+    setDeleteConfirmError(null);
+    try {
+      await deleteCharacterWeeklyRaidsByRaid(characterId, {
+        raidInfoId: raidId,
+      });
+      setDeleteConfirmOpen(false);
+      onSaved();
+      onClose();
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "레이드 숙제 삭제에 실패했습니다.";
+      setDeleteConfirmError(msg);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (!mounted || !raidId) return null;
 
   return createPortal(
+    <>
     <AnimatePresence>
       {open ? (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
@@ -245,11 +299,22 @@ export function EditWeeklyRaidModal({
           {error ? <div className="alert alert-error">{error}</div> : null}
         </div>
 
-        <div className="flex justify-end border-t border-slate-700 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-700 px-5 py-4">
+          <button
+            type="button"
+            className="btn btn-outline btn-error btn-sm sm:btn-md"
+            disabled={deleting || saving || loading || weeklyRows.length === 0}
+            onClick={() => {
+              setDeleteConfirmError(null);
+              setDeleteConfirmOpen(true);
+            }}
+          >
+            레이드 삭제
+          </button>
           <button
             type="button"
             className="btn btn-primary min-w-36"
-            disabled={saving || loading}
+            disabled={saving || deleting || loading}
             onClick={handleSave}
           >
             {saving ? "수정 중..." : "수정하기"}
@@ -258,7 +323,83 @@ export function EditWeeklyRaidModal({
           </motion.div>
         </div>
       ) : null}
-    </AnimatePresence>,
+    </AnimatePresence>
+
+    <AnimatePresence>
+      {open && deleteConfirmOpen ? (
+        <div className="fixed inset-0 z-[170] flex items-center justify-center p-4">
+          <motion.button
+            type="button"
+            className="absolute inset-0 bg-slate-950/80"
+            aria-label="닫기"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            disabled={deleting}
+            onClick={() => {
+              if (!deleting) setDeleteConfirmOpen(false);
+            }}
+          />
+          <motion.div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="raid-delete-confirm-title"
+            aria-describedby="raid-delete-confirm-desc"
+            className="relative z-10 w-full max-w-md rounded-2xl border border-slate-600 bg-slate-900 p-5 text-slate-100 shadow-2xl"
+            initial={{ opacity: 0, scale: 0.96, y: 6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 6 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4
+              id="raid-delete-confirm-title"
+              className="text-lg font-bold text-slate-100"
+            >
+              레이드 숙제 삭제
+            </h4>
+            <p
+              id="raid-delete-confirm-desc"
+              className="mt-3 text-sm leading-relaxed text-slate-300"
+            >
+              <span className="font-semibold text-amber-200/90">
+                &quot;{raidName}&quot;
+              </span>
+              {" "}레이드 숙제를 모두 삭제할까요?
+              <br />
+              <span className="text-slate-400">
+                이 레이드에 등록된 모든 관문이 제거됩니다.
+              </span>
+            </p>
+            {deleteConfirmError ? (
+              <div className="alert alert-error mt-3 text-sm">
+                {deleteConfirmError}
+              </div>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={deleting}
+                onClick={() => setDeleteConfirmOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="btn btn-error btn-sm"
+                disabled={deleting}
+                onClick={() => void performDelete()}
+              >
+                {deleting ? "삭제 중..." : "삭제"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      ) : null}
+    </AnimatePresence>
+    </>,
     document.body,
   );
 }

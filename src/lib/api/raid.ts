@@ -4,6 +4,8 @@ import type {
   CreateCharacterWeeklyRaidsRequest,
   CreateRaidGateRequest,
   CreateRaidRequest,
+  DeleteCharacterWeeklyRaidsByRaidRequest,
+  PutCharacterWeeklyRaidsRequest,
   RaidDetail,
   RaidSimple,
   RaidGateInfo,
@@ -118,6 +120,26 @@ export async function createCharacterWeeklyRaids(
 ): Promise<void> {
   await apiFetch<unknown>(`/characters/${characterId}/weekly-raids`, {
     method: "POST",
+    json: payload,
+  });
+}
+
+export async function putCharacterWeeklyRaids(
+  characterId: number,
+  payload: PutCharacterWeeklyRaidsRequest,
+): Promise<void> {
+  await apiFetch<unknown>(`/characters/${characterId}/weekly-raids`, {
+    method: "PUT",
+    json: payload,
+  });
+}
+
+export async function deleteCharacterWeeklyRaidsByRaid(
+  characterId: number,
+  payload: DeleteCharacterWeeklyRaidsByRaidRequest,
+): Promise<void> {
+  await apiFetch<unknown>(`/characters/${characterId}/weekly-raids/raid`, {
+    method: "DELETE",
     json: payload,
   });
 }

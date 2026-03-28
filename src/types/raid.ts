@@ -87,6 +87,14 @@ export type CreateCharacterWeeklyRaidsRequest = {
   raidGateSelections: WeeklyRaidGateSelection[];
 };
 
+/** PUT /characters/:characterId/weekly-raids — 본문 형태는 POST와 동일 */
+export type PutCharacterWeeklyRaidsRequest = CreateCharacterWeeklyRaidsRequest;
+
+/** DELETE /characters/:characterId/weekly-raids/raid */
+export type DeleteCharacterWeeklyRaidsByRaidRequest = {
+  raidInfoId: number;
+};
+
 export type CharacterWeeklyRaidItem = {
   id: number;
   characterId: number;
@@ -125,9 +133,6 @@ export type CharacterWeeklyRaidItem = {
 };
 
 export type UpdateCharacterWeeklyRaidRequest = {
-  characterId: number;
-  data: {
-    raidGateInfoId: number;
-    isExtraRewardSelected: boolean;
-  };
+  raidGateInfoId: number;
+  isExtraRewardSelected: boolean;
 };

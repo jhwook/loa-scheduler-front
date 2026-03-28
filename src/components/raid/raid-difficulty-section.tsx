@@ -32,6 +32,15 @@ export function RaidDifficultySection({
   onToggleSelected,
   onToggleExtra,
 }: Props) {
+  const gateCount = section.gates.length;
+  const gridColsClass =
+    gateCount <= 1
+      ? "grid-cols-1"
+      : gateCount === 2
+        ? "grid-cols-1 sm:grid-cols-2"
+        : "grid-cols-1 sm:grid-cols-3";
+  const compact = gateCount >= 3;
+
   return (
     <section className="space-y-2.5">
       <h4 className="flex items-center gap-2 text-lg font-semibold text-slate-200">
@@ -39,18 +48,20 @@ export function RaidDifficultySection({
           {section.difficulty}
         </span>
       </h4>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className={`grid gap-2 ${gridColsClass}`}>
         {section.gates.map((gate) => {
           const state = values[gate.raidGateInfoId] ?? { selected: false, extra: false };
           return (
-            <RaidGateCard
-              key={gate.raidGateInfoId}
-              gate={gate}
-              selected={state.selected}
-              extraSelected={state.extra}
-              onChangeSelected={(next) => onToggleSelected(gate.raidGateInfoId, next)}
-              onChangeExtra={(next) => onToggleExtra(gate.raidGateInfoId, next)}
-            />
+            <div key={gate.raidGateInfoId} className="min-w-0">
+              <RaidGateCard
+                gate={gate}
+                compact={compact}
+                selected={state.selected}
+                extraSelected={state.extra}
+                onChangeSelected={(next) => onToggleSelected(gate.raidGateInfoId, next)}
+                onChangeExtra={(next) => onToggleExtra(gate.raidGateInfoId, next)}
+              />
+            </div>
           );
         })}
       </div>

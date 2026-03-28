@@ -327,25 +327,25 @@ export function ExpeditionCharacterCard({ character: c }: Props) {
                   className={idx === 0 ? '' : 'border-t border-slate-800 pt-3'}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-[15px] font-semibold text-slate-100">
+                        <p className="truncate text-[13px] font-semibold text-slate-100">
                           {group.raidName}
                         </p>
                         <button
                           type="button"
-                          className="btn btn-ghost btn-xs min-h-0 h-7 w-7 p-0 text-slate-300"
+                          className="btn btn-ghost btn-xs min-h-0 h-6 w-6 shrink-0 p-0 text-slate-300"
                           onClick={() => {
                             setEditModalRaidId(group.raidId);
                             setEditModalRaidName(group.raidName);
                           }}
                           aria-label={`${group.raidName} 설정`}
                         >
-                          <span className="text-xl leading-none">⚙</span>
+                          <span className="text-lg leading-none">⚙</span>
                         </button>
                       </div>
-                      <p className="mt-1 text-[24px] leading-none text-amber-300">
-                        <span className="text-[22px] font-bold">
+                      <p className="mt-0.5 text-[20px] leading-none text-amber-300">
+                        <span className="text-[18px] font-bold">
                           {group.items
                             .reduce((acc, row) => {
                               const base =
@@ -360,7 +360,7 @@ export function ExpeditionCharacterCard({ character: c }: Props) {
                             }, 0)
                             .toLocaleString()}
                         </span>
-                        <span className="ml-1 text-[12px]">G</span>
+                        <span className="ml-1 text-[11px]">G</span>
                       </p>
                     </div>
                     <div className="flex items-end gap-1.5">
@@ -431,6 +431,7 @@ export function ExpeditionCharacterCard({ character: c }: Props) {
       <EditWeeklyRaidModal
         open={Boolean(editModalRaidId)}
         characterId={c.id}
+        allWeeklyRows={weeklyRaids}
         raidId={editModalRaidId}
         raidName={editModalRaidName}
         weeklyRows={
