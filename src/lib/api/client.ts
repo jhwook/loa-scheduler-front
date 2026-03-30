@@ -1,10 +1,14 @@
 import { getAccessToken } from "@/lib/auth/storage";
 import { ApiError } from "@/types/api";
 
-function getBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const base =
     process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8080";
   return base.replace(/\/$/, "");
+}
+
+function getBaseUrl(): string {
+  return getApiBaseUrl();
 }
 
 type JsonBody = Record<string, unknown> | unknown[] | null;

@@ -8,13 +8,69 @@ import {
   getCharacterWeeklyRaids,
   patchCharacterWeeklyRaidClear,
 } from '@/lib/api/raid';
+import { getClassIconSrc, resolveClassIconBasename } from '@/lib/class-icon';
 import { ApiError } from '@/types/api';
 import type { MySavedCharacter } from '@/types/expedition';
 import type { CharacterWeeklyRaidItem } from '@/types/raid';
 
 type Props = {
   character: MySavedCharacter;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  cooldownRemainingSec: number;
+  /** 전체 새로고침 등으로 개별 버튼을 잠글 때 */
+  refreshLocked: boolean;
 };
+
+function InlineSpinner({ className }: { className?: string }) {
+  return (
+    <svg
+      className={`animate-spin ${className ?? 'h-3.5 w-3.5'}`}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+function formatRelativeLastSynced(iso?: string | null): string {
+  if (!iso?.trim()) return '기록 없음';
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '기록 없음';
+  const sec = Math.floor((Date.now() - t) / 1000);
+  if (sec < 0) return '방금';
+  if (sec < 60) return `${sec}초 전`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  const day = Math.floor(hr / 24);
+  return `${day}일 전`;
+}
+
+function RelativeLastSynced({ at }: { at?: string | null }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((x) => x + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return <span>{formatRelativeLastSynced(at)}</span>;
+}
 
 function formatLvText(itemAvgLevel: string): string {
   const raw = String(itemAvgLevel ?? '').replace(/,/g, '');
@@ -43,8 +99,15 @@ function difficultyBadgeClass(difficulty: string): string {
 /**
  * 쇼핑몰 상품 카드처럼 상단 이미지 + 하단 정보
  */
-export function ExpeditionCharacterCard({ character: c }: Props) {
+export function ExpeditionCharacterCard({
+  character: c,
+  isRefreshing,
+  onRefresh,
+  cooldownRemainingSec,
+  refreshLocked,
+}: Props) {
   const [imageFailed, setImageFailed] = useState(false);
+  const [classIconFailed, setClassIconFailed] = useState(false);
   const [raidModalOpen, setRaidModalOpen] = useState(false);
   const [weeklyRaids, setWeeklyRaids] = useState<CharacterWeeklyRaidItem[]>([]);
   const [editModalRaidId, setEditModalRaidId] = useState<number | null>(null);
@@ -58,6 +121,22 @@ export function ExpeditionCharacterCard({ character: c }: Props) {
   const showImage = Boolean(src) && !imageFailed;
   const lvText = formatLvText(c.itemAvgLevel);
   const classMark = (c.characterClassName?.[0] ?? '?').toUpperCase();
+  const classIconBasename = useMemo(
+    () => resolveClassIconBasename(c.characterClassName),
+    [c.characterClassName],
+  );
+  const classIconSrc = classIconBasename
+    ? getClassIconSrc(classIconBasename)
+    : null;
+
+  useEffect(() => {
+    setClassIconFailed(false);
+  }, [classIconSrc]);
+
+  const refreshDisabled =
+    isRefreshing ||
+    cooldownRemainingSec > 0 ||
+    refreshLocked;
 
   const loadWeeklyRaids = useCallback(async () => {
     try {
@@ -202,6 +281,13 @@ export function ExpeditionCharacterCard({ character: c }: Props) {
     }
   }
 
+  const editModalWeeklyRows = useMemo(() => {
+    if (!editModalRaidId) return [];
+    return weeklyRaids.filter(
+      (row) => row.raidGateInfo.raidInfo.id === editModalRaidId,
+    );
+  }, [editModalRaidId, weeklyRaids]);
+
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-950 shadow-sm">
       <div className="relative aspect-[3/4] w-full shrink-0 bg-slate-100">
@@ -220,15 +306,61 @@ export function ExpeditionCharacterCard({ character: c }: Props) {
             </span>
           </div>
         )}
-        <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-md bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+        <span className="absolute left-2 top-2 z-[1] max-w-[calc(100%-4rem)] truncate rounded-md bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
           {c.serverName}
         </span>
+        <button
+          type="button"
+          aria-label="캐릭터 새로고침"
+          title={
+            cooldownRemainingSec > 0 && !isRefreshing
+              ? `${cooldownRemainingSec}초 후 다시 시도`
+              : '캐릭터 정보 새로고침'
+          }
+          disabled={refreshDisabled}
+          onClick={onRefresh}
+          className="absolute right-2 top-2 z-10 flex min-h-8 min-w-8 items-center justify-center gap-0.5 rounded-md border border-slate-600/80 bg-slate-900/90 px-1.5 text-slate-100 shadow backdrop-blur-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isRefreshing ? (
+            <InlineSpinner className="h-3.5 w-3.5 text-slate-100" />
+          ) : (
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          )}
+          {cooldownRemainingSec > 0 && !isRefreshing ? (
+            <span className="text-[9px] font-semibold tabular-nums">
+              {cooldownRemainingSec}s
+            </span>
+          ) : null}
+        </button>
       </div>
 
       <div className="border-t border-slate-800 bg-slate-900 px-3 py-2.5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-500 bg-slate-800 text-[12px] font-bold text-slate-100">
-            {classMark}
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-500 bg-slate-800 text-[12px] font-bold text-slate-100">
+            {classIconSrc && !classIconFailed ? (
+              // eslint-disable-next-line @next/next/no-img-element -- public 정적 직업 아이콘
+              <img
+                src={classIconSrc}
+                alt=""
+                className="h-full w-full object-cover brightness-0 invert"
+                onError={() => setClassIconFailed(true)}
+              />
+            ) : (
+              classMark
+            )}
           </div>
           <div className="min-w-0">
             <h3 className="truncate text-[17px] font-bold leading-tight text-slate-100">
@@ -242,6 +374,10 @@ export function ExpeditionCharacterCard({ character: c }: Props) {
               <span className="font-semibold text-rose-400">
                 {c.combatPower}
               </span>
+            </p>
+            <p className="mt-1 text-[10px] text-slate-500">
+              최근 업데이트:{' '}
+              <RelativeLastSynced at={c.lastSyncedAt} />
             </p>
           </div>
         </div>
@@ -434,13 +570,7 @@ export function ExpeditionCharacterCard({ character: c }: Props) {
         allWeeklyRows={weeklyRaids}
         raidId={editModalRaidId}
         raidName={editModalRaidName}
-        weeklyRows={
-          editModalRaidId
-            ? weeklyRaids.filter(
-                (row) => row.raidGateInfo.raidInfo.id === editModalRaidId
-              )
-            : []
-        }
+        weeklyRows={editModalWeeklyRows}
         onClose={() => {
           setEditModalRaidId(null);
           setEditModalRaidName('');

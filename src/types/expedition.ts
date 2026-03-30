@@ -41,6 +41,8 @@ export type MySavedCharacter = {
   townName: string | null;
   pvpGradeName: string | null;
   combatPower: string;
+  /** 서버에서 마지막으로 동기화된 시각 (ISO 8601) */
+  lastSyncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
