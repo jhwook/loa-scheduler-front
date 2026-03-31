@@ -363,10 +363,10 @@ export function ExpeditionCharacterCard({
             )}
           </div>
           <div className="min-w-0">
-            <h3 className="truncate text-[17px] font-bold leading-tight text-slate-100">
+            <h3 className="truncate text-[clamp(14px,1.15vw,17px)] font-bold leading-tight text-slate-100">
               {c.characterName}
             </h3>
-            <p className="mt-0.5 truncate text-[13px] text-slate-300">
+            <p className="mt-0.5 truncate text-[clamp(11px,0.9vw,13px)] text-slate-300">
               <span>{c.serverName}</span>
               <span className="mx-1.5 text-slate-500">/</span>
               <span>Lv.{lvText}</span>
@@ -375,7 +375,7 @@ export function ExpeditionCharacterCard({
                 {c.combatPower}
               </span>
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">
+            <p className="mt-1 text-[clamp(9px,0.75vw,10px)] text-slate-500">
               최근 업데이트:{' '}
               <RelativeLastSynced at={c.lastSyncedAt} />
             </p>
@@ -421,7 +421,7 @@ export function ExpeditionCharacterCard({
         </div>
 
         <div className="border-t border-slate-800 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3 py-3">
-          <p className="flex items-end justify-center gap-1 text-[14px] font-bold text-amber-300">
+          <p className="flex items-end justify-center gap-1 text-[clamp(12px,0.95vw,14px)] font-bold text-amber-300">
             <span className="inline-flex items-center">
               {animatedCurrentClearGold.toLocaleString()}
             </span>
@@ -439,7 +439,7 @@ export function ExpeditionCharacterCard({
 
         <div className="border-t border-slate-800 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3 py-3">
           <div className="flex items-center justify-between border-b border-slate-700 pb-2">
-            <p className="text-[15px] font-semibold text-indigo-300">레이드</p>
+            <p className="text-[clamp(13px,1vw,15px)] font-semibold text-indigo-300">레이드</p>
             <button
               type="button"
               className="rounded-md border border-slate-600 bg-slate-800/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200"
@@ -465,7 +465,7 @@ export function ExpeditionCharacterCard({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-[13px] font-semibold text-slate-100">
+                        <p className="truncate text-[clamp(11px,0.9vw,13px)] font-semibold text-slate-100">
                           {group.raidName}
                         </p>
                         <button
@@ -480,8 +480,8 @@ export function ExpeditionCharacterCard({
                           <span className="text-lg leading-none">⚙</span>
                         </button>
                       </div>
-                      <p className="mt-0.5 text-[20px] leading-none text-amber-300">
-                        <span className="text-[18px] font-bold">
+                      <p className="mt-0.5 text-[clamp(15px,1.3vw,20px)] leading-none text-amber-300">
+                        <span className="text-[clamp(14px,1.15vw,18px)] font-bold">
                           {group.items
                             .reduce((acc, row) => {
                               const base =
@@ -496,7 +496,7 @@ export function ExpeditionCharacterCard({
                             }, 0)
                             .toLocaleString()}
                         </span>
-                        <span className="ml-1 text-[11px]">G</span>
+                        <span className="ml-1 text-[clamp(10px,0.8vw,11px)]">G</span>
                       </p>
                     </div>
                     <div className="flex items-end gap-1.5">
@@ -514,7 +514,7 @@ export function ExpeditionCharacterCard({
                           </span>
                           <button
                             type="button"
-                            className={`indicator relative flex h-10 w-10 items-center justify-center rounded-md border text-[16px] font-semibold ${
+                            className={`indicator relative flex h-10 w-10 items-center justify-center rounded-md border text-[clamp(13px,1vw,16px)] font-semibold ${
                               row.isCleared
                                 ? 'border-emerald-500 bg-emerald-900/40 text-emerald-200'
                                 : 'border-slate-700 bg-slate-950 text-slate-200'
@@ -538,10 +538,10 @@ export function ExpeditionCharacterCard({
               ))}
 
               <div className="flex items-end justify-between border-t border-slate-800 pt-2">
-                <span className="text-[16px] font-bold text-amber-300">
+                <span className="text-[clamp(13px,1vw,16px)] font-bold text-amber-300">
                   합계
                 </span>
-                <div className="inline-flex items-end gap-2 text-[14px] font-bold text-amber-300">
+                <div className="inline-flex items-end gap-2 text-[clamp(12px,0.95vw,14px)] font-bold text-amber-300">
                   <span>{totalGold.normal.toLocaleString()} G</span>
                   <span className="text-slate-500">/</span>
                   <span className="inline-flex flex-col items-start">
