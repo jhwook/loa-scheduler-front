@@ -256,7 +256,7 @@ export function ExpeditionMyCharacterList() {
             {serverName}{" "}
             <span className="font-normal text-slate-400">({chars.length})</span>
           </h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(254px,1fr))]">
             {chars.map((c) => (
               <ExpeditionCharacterCard
                 key={c.id}

@@ -46,9 +46,9 @@ export default function Sidebar() {
                   : "text-slate-700 hover:bg-slate-100")
               }
             >
-              <div className="avatar">
-                <div className="h-9 w-9 rounded-2xl bg-slate-900 p-[3px]">
-                  <div className="flex h-full w-full items-end justify-between rounded-xl bg-slate-950 px-[3px] pb-[3px]">
+              <div>
+                <div className="h-9 w-9 p-[3px]">
+                  <div className="flex h-full w-full items-end justify-between rounded-xl bg-transparent px-[3px] pb-[3px]">
                     <span className="h-3 w-1.5 rounded-sm bg-sky-400" />
                     <span className="h-4 w-1.5 rounded-sm bg-emerald-400" />
                     <span className="h-5 w-1.5 rounded-sm bg-fuchsia-400" />
@@ -68,10 +68,8 @@ export default function Sidebar() {
                   : " text-slate-700 hover:bg-slate-100")
               }
             >
-              <div className="avatar placeholder">
-                <div className="h-9 w-9 rounded-lg bg-slate-100 text-sm">
-                  📅
-                </div>
+              <div className="flex h-9 w-9 items-center justify-center text-sm">
+                📅
               </div>
               <span>레이드 일정</span>
             </Link>
@@ -92,12 +90,32 @@ export default function Sidebar() {
                   : " text-slate-700 hover:bg-slate-100")
               }
             >
-              <div className="avatar placeholder">
-                <div className="h-9 w-9 rounded-full bg-slate-100 text-sm">
-                  👥
-                </div>
+              <div className="flex h-9 w-9 items-center justify-center text-sm">
+                👥
               </div>
               <span>원정대</span>
+            </Link>
+          </li>
+        </ul>
+
+        <p className="menu-title mt-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          그룹
+        </p>
+        <ul className="menu w-full bg-transparent p-0 text-sm">
+          <li>
+            <Link
+              href="/party"
+              className={
+                itemBaseClasses +
+                (isActive("/party")
+                  ? " active bg-slate-800/95 text-slate-50"
+                  : " text-slate-700 hover:bg-slate-100")
+              }
+            >
+              <div className="flex h-9 w-9 items-center justify-center text-sm">
+                ⚔️
+              </div>
+              <span className="font-semibold">공격대</span>
             </Link>
           </li>
         </ul>
@@ -116,8 +134,8 @@ export default function Sidebar() {
                   : " text-slate-700 hover:bg-slate-100")
               }
             >
-              <div className="avatar placeholder">
-                <div className="h-9 w-9 rounded-lg bg-slate-100 text-sm">🛠️</div>
+              <div className="flex h-9 w-9 items-center justify-center text-sm">
+                🛠️
               </div>
               <span>레이드 관리</span>
             </Link>
