@@ -1,9 +1,9 @@
-import Sidebar from "../components/Sidebar";
+import Sidebar from '../components/Sidebar';
 
-import { RequireAuth } from "@/components/features/auth/RequireAuth";
-import { ExpeditionAddButton } from "@/components/features/expedition/ExpeditionAddButton";
-import { ExpeditionHeader } from "@/components/features/expedition/ExpeditionHeader";
-import { ExpeditionMyCharacterList } from "@/components/features/expedition/ExpeditionMyCharacterList";
+import { RequireAuth } from '@/components/features/auth/RequireAuth';
+import { ExpeditionAddButton } from '@/components/features/expedition/ExpeditionAddButton';
+import { ExpeditionHeader } from '@/components/features/expedition/ExpeditionHeader';
+import { ExpeditionMyCharacterList } from '@/components/features/expedition/ExpeditionMyCharacterList';
 
 export default function ExpeditionPage() {
   return (

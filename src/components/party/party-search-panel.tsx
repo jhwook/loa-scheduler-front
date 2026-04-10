@@ -29,12 +29,12 @@ export function PartySearchPanel({ className = "" }: Props) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="공격대 이름으로 검색"
-        className="input input-bordered w-full border-slate-600 bg-slate-900/80 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        className="input input-bordered w-full border-base-300 bg-base-200/80 text-sm text-base-content placeholder:text-base-content/60 focus:outline-none focus:ring-1 focus:ring-primary"
         autoComplete="off"
       />
       <button
         type="submit"
-        className="btn btn-primary btn-sm shrink-0 px-5 text-slate-950"
+        className="btn btn-primary btn-sm shrink-0 px-5 text-primary-content"
       >
         검색
       </button>

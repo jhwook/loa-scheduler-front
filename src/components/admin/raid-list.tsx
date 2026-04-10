@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import type { RaidInfo } from "@/types/raid";
+import type { RaidInfo } from '@/types/raid';
 
 type Props = {
   raids: RaidInfo[];
@@ -28,23 +28,27 @@ export function RaidList({
   onDelete,
 }: Props) {
   async function confirmDelete(raidId: number) {
-    const ok = window.confirm("해당 레이드를 삭제하시겠습니까?");
+    const ok = window.confirm('해당 레이드를 삭제하시겠습니까?');
     if (!ok) return;
     await onDelete(raidId);
   }
 
   return (
-    <section className="card h-full border border-slate-200 bg-white text-slate-900">
+    <section className="card h-full border border-base-300 bg-base-200 text-base-content">
       <div className="card-body p-4 md:p-5">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="card-title text-base">레이드 목록</h3>
-          {loading ? <span className="loading loading-spinner loading-xs" /> : null}
+          {loading ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : null}
         </div>
         {raids.length === 0 ? (
-          <p className="text-sm text-slate-500">등록된 레이드가 없습니다.</p>
+          <p className="text-sm text-base-content/60">
+            등록된 레이드가 없습니다.
+          </p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="table table-sm bg-white text-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-base-300">
+            <table className="table table-sm bg-base-200 text-base-content">
               <thead className="text-slate-700">
                 <tr>
                   <th>레이드명</th>
@@ -58,29 +62,37 @@ export function RaidList({
                 {raids.map((raid) => (
                   <tr
                     key={raid.id}
-                    className={selectedRaidId === raid.id ? "bg-slate-100/80" : "bg-white"}
+                    className={
+                      selectedRaidId === raid.id
+                        ? 'bg-base-200/80'
+                        : 'bg-base-200'
+                    }
                   >
-                    <td className="font-medium text-slate-900">{raid.raidName}</td>
+                    <td className="font-medium text-base-content">
+                      {raid.raidName}
+                    </td>
                     <td>{raid.orderNo}</td>
                     <td>
                       <span
                         className={`badge badge-sm ${
                           raid.isActive
-                            ? "badge-success text-emerald-900"
-                            : "border border-slate-400 bg-slate-200 text-slate-700"
+                            ? 'badge-success text-success'
+                            : 'border border-base-300 bg-base-300 text-slate-700'
                         }`}
                       >
-                        {raid.isActive ? "활성" : "비활성"}
+                        {raid.isActive ? '활성' : '비활성'}
                       </span>
                     </td>
                     <td>
                       <label className="label cursor-pointer justify-start gap-2 py-0">
                         <input
                           type="checkbox"
-                          className="toggle toggle-xs border-slate-500 bg-slate-300 text-slate-700 checked:border-indigo-600 checked:bg-indigo-600"
+                          className="toggle toggle-xs border-base-content/20 bg-base-300 text-slate-700 checked:border-primary checked:bg-primary"
                           checked={raid.isActive}
                           disabled={togglePendingRaidId === raid.id}
-                          onChange={(e) => onToggleActive(raid.id, e.target.checked)}
+                          onChange={(e) =>
+                            onToggleActive(raid.id, e.target.checked)
+                          }
                         />
                       </label>
                     </td>
@@ -89,7 +101,9 @@ export function RaidList({
                         <button
                           type="button"
                           className={`btn btn-xs ${
-                            selectedRaidId === raid.id ? "btn-neutral" : "btn-outline"
+                            selectedRaidId === raid.id
+                              ? 'btn-neutral'
+                              : 'btn-outline'
                           }`}
                           onClick={() => onSelect(raid.id)}
                         >
@@ -97,19 +111,19 @@ export function RaidList({
                         </button>
                         <button
                           type="button"
-                          className="btn btn-xs btn-outline border-slate-300"
+                          className="btn btn-xs btn-outline border-base-300"
                           onClick={() => onEdit(raid)}
                           disabled={updatePendingRaidId === raid.id}
                         >
-                          {updatePendingRaidId === raid.id ? "수정 중" : "수정"}
+                          {updatePendingRaidId === raid.id ? '수정 중' : '수정'}
                         </button>
                         <button
                           type="button"
-                          className="btn btn-xs btn-outline border-rose-300 text-rose-700"
+                          className="btn btn-xs btn-outline border-error/40 text-error"
                           onClick={() => confirmDelete(raid.id)}
                           disabled={deletePendingRaidId === raid.id}
                         >
-                          {deletePendingRaidId === raid.id ? "삭제 중" : "삭제"}
+                          {deletePendingRaidId === raid.id ? '삭제 중' : '삭제'}
                         </button>
                       </div>
                     </td>

@@ -1,27 +1,24 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: dim --default;
+}
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* dim 기본보다 한 단계 진한 캔버스(다크 그레이/쿨 톤). Hue는 dim과 비슷하게 유지 */
+[data-theme="dim"] {
+  /* 4번째 A(가장 진한 톤) 유지 + 가독성(경계/텍스트 대비) 보정 */
+  --color-base-100: oklch(17% 0.009 264);   /* page bg */
+  --color-base-200: oklch(24% 0.011 264);   /* raised surfaces */
+  --color-base-300: oklch(31% 0.012 264);   /* borders / hover / higher surfaces */
+  --color-base-content: oklch(94% 0.028 223);
+  --color-neutral: oklch(14.5% 0.008 264);
+  --color-neutral-content: oklch(94% 0.028 223);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }

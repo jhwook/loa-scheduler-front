@@ -1,3 +1,5 @@
+import type { CharacterWeeklyRaidItem } from "@/types/raid";
+
 /** POST /users/me/expedition-preview 응답 항목 */
 export type ExpeditionPreviewCharacter = {
   serverName: string;
@@ -46,3 +48,63 @@ export type MySavedCharacter = {
   createdAt: string;
   updatedAt: string;
 };
+
+/** GET /characters/dashboard 의 characters[] 항목 */
+export type CharacterDashboardRow = {
+  id: number;
+  characterName: string;
+  /** 캐릭터 초상 이미지 URL (API 제공 시 사용) */
+  characterImage?: string | null;
+  serverName: string | null;
+  characterClassName: string | null;
+  characterLevel: number | null;
+  itemAvgLevel: string | null;
+  itemMaxLevel: string | null;
+  combatPower: string | null;
+  lastSyncedAt: string | null;
+  weeklyGoldTotal: number;
+  weeklyBoundGoldTotal: number;
+  weeklyRaids: CharacterWeeklyRaidItem[];
+};
+
+/** GET /characters/dashboard 응답 */
+export type CharactersDashboardResponse = {
+  totalCharacterCount: number;
+  totalWeeklyGold: number;
+  totalWeeklyBoundGold: number;
+  characters: CharacterDashboardRow[];
+};
+
+/** DELETE /characters/:characterId 응답 */
+export type DeleteCharacterResponse = {
+  message?: string;
+  deletedCharacter?: {
+    id: number;
+    characterName: string;
+  };
+};
+
+/** 대시보드 한 행 → 카드용 `MySavedCharacter` (미제공 필드는 빈 값) */
+export function mapDashboardCharacterToMySaved(
+  c: CharacterDashboardRow,
+): MySavedCharacter {
+  return {
+    id: c.id,
+    characterName: c.characterName,
+    serverName: c.serverName ?? "",
+    characterClassName: c.characterClassName ?? "",
+    characterLevel: c.characterLevel ?? 0,
+    characterImage: c.characterImage ?? null,
+    itemAvgLevel: c.itemAvgLevel ?? "",
+    itemMaxLevel: c.itemMaxLevel,
+    expeditionLevel: 0,
+    title: "",
+    guildName: null,
+    townName: null,
+    pvpGradeName: null,
+    combatPower: c.combatPower ?? "",
+    lastSyncedAt: c.lastSyncedAt,
+    createdAt: "",
+    updatedAt: "",
+  };
+}

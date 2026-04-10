@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent } from 'react';
 
-import type { CreateRaidGateRequest } from "@/types/raid";
+import type { CreateRaidGateRequest } from '@/types/raid';
 
 type Props = {
   raidId: number | null;
@@ -11,9 +11,9 @@ type Props = {
 };
 
 export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
-  const [difficulty, setDifficulty] = useState("하드");
+  const [difficulty, setDifficulty] = useState('하드');
   const [gateNumber, setGateNumber] = useState(1);
-  const [gateName, setGateName] = useState("1관문");
+  const [gateName, setGateName] = useState('1관문');
   const [minItemLevel, setMinItemLevel] = useState(1730);
   const [rewardGold, setRewardGold] = useState(5000);
   const [boundGold, setBoundGold] = useState(2500);
@@ -44,7 +44,10 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card border border-slate-200 bg-white text-slate-900">
+    <form
+      onSubmit={handleSubmit}
+      className="card border border-base-300 bg-base-200 text-base-content"
+    >
       <div className="card-body p-4 md:p-5">
         <h3 className="card-title text-base">관문 추가</h3>
         <div className="grid gap-3 md:grid-cols-3">
@@ -54,7 +57,7 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
             </div>
             <input
               type="text"
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value)}
               required
@@ -67,7 +70,7 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
             <input
               type="number"
               min={1}
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={gateNumber}
               onChange={(e) => setGateNumber(Number(e.target.value))}
               required
@@ -79,7 +82,7 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
             </div>
             <input
               type="text"
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={gateName}
               onChange={(e) => setGateName(e.target.value)}
               required
@@ -87,12 +90,14 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
           </label>
           <label className="form-control gap-2">
             <div className="label pb-2 pt-1">
-              <span className="label-text text-slate-700">최소 아이템 레벨</span>
+              <span className="label-text text-slate-700">
+                최소 아이템 레벨
+              </span>
             </div>
             <input
               type="number"
               min={0}
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={minItemLevel}
               onChange={(e) => setMinItemLevel(Number(e.target.value))}
               required
@@ -105,7 +110,7 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
             <input
               type="number"
               min={0}
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={rewardGold}
               onChange={(e) => setRewardGold(Number(e.target.value))}
               required
@@ -118,7 +123,7 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
             <input
               type="number"
               min={0}
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={boundGold}
               onChange={(e) => setBoundGold(Number(e.target.value))}
               required
@@ -131,7 +136,7 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
             <input
               type="number"
               min={1}
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={orderNo}
               onChange={(e) => setOrderNo(Number(e.target.value))}
               required
@@ -139,12 +144,14 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
           </label>
           <label className="form-control gap-2">
             <div className="label pb-2 pt-1">
-              <span className="label-text text-slate-700">더보기 골드 비용</span>
+              <span className="label-text text-slate-700">
+                더보기 골드 비용
+              </span>
             </div>
             <input
               type="number"
               min={0}
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900 disabled:bg-slate-100"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content disabled:bg-base-200"
               value={extraRewardCost}
               onChange={(e) => setExtraRewardCost(Number(e.target.value))}
               disabled={!canExtraReward}
@@ -182,7 +189,7 @@ export function RaidGateForm({ raidId, pending, onSubmit }: Props) {
             className="btn btn-primary btn-sm"
             disabled={!raidId || pending}
           >
-            {pending ? "추가 중..." : "관문 추가"}
+            {pending ? '추가 중...' : '관문 추가'}
           </button>
         </div>
       </div>

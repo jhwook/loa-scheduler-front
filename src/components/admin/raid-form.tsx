@@ -28,7 +28,7 @@ export function RaidForm({ pending, onSubmit }: Props) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="card border border-slate-200 bg-white text-slate-900"
+      className="card border border-base-300 bg-base-200 text-base-content"
     >
       <div className="card-body gap-4 p-4 md:p-5">
         <h3 className="card-title text-base">새 레이드 추가</h3>
@@ -39,7 +39,7 @@ export function RaidForm({ pending, onSubmit }: Props) {
             </div>
             <input
               type="text"
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={raidName}
               onChange={(e) => setRaidName(e.target.value)}
               required
@@ -53,7 +53,7 @@ export function RaidForm({ pending, onSubmit }: Props) {
             <input
               type="number"
               min={1}
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={orderNo}
               onChange={(e) => setOrderNo(Number(e.target.value))}
               required

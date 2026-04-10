@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import type { RaidGateInfo } from "@/types/raid";
+import type { RaidGateInfo } from '@/types/raid';
 
 type Props = {
   gates: RaidGateInfo[];
@@ -22,23 +22,27 @@ export function RaidGateList({
   onToggleActive,
 }: Props) {
   async function confirmDelete(gateId: number) {
-    const ok = window.confirm("해당 관문을 삭제하시겠습니까?");
+    const ok = window.confirm('해당 관문을 삭제하시겠습니까?');
     if (!ok) return;
     await onDelete(gateId);
   }
 
   return (
-    <section className="card border border-slate-200 bg-white text-slate-900">
+    <section className="card border border-base-300 bg-base-200 text-base-content">
       <div className="card-body p-4 md:p-5">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="card-title text-base">관문 목록</h3>
-          {loading ? <span className="loading loading-spinner loading-xs" /> : null}
+          {loading ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : null}
         </div>
         {gates.length === 0 ? (
-          <p className="text-sm text-slate-500">선택된 레이드의 관문이 없습니다.</p>
+          <p className="text-sm text-base-content/60">
+            선택된 레이드의 관문이 없습니다.
+          </p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="table table-sm bg-white text-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-base-300">
+            <table className="table table-sm bg-base-200 text-base-content">
               <thead className="text-slate-700">
                 <tr>
                   <th>순서</th>
@@ -56,10 +60,10 @@ export function RaidGateList({
               </thead>
               <tbody>
                 {gates.map((gate) => (
-                  <tr key={gate.id} className="bg-white">
+                  <tr key={gate.id} className="bg-base-200">
                     <td>{gate.orderNo}</td>
                     <td>{gate.difficulty}</td>
-                    <td>{gate.isSingleMode ? "싱글" : "일반"}</td>
+                    <td>{gate.isSingleMode ? '싱글' : '일반'}</td>
                     <td>
                       {gate.gateNumber}관 / {gate.gateName}
                     </td>
@@ -72,26 +76,28 @@ export function RaidGateList({
                           가능 / {(gate.extraRewardCost ?? 0).toLocaleString()}
                         </span>
                       ) : (
-                        <span className="text-slate-500">없음</span>
+                        <span className="text-base-content/60">없음</span>
                       )}
                     </td>
                     <td>
                       <span
                         className={`badge badge-sm ${
-                          gate.isActive ? "badge-success" : "badge-ghost"
+                          gate.isActive ? 'badge-success' : 'badge-ghost'
                         }`}
                       >
-                        {gate.isActive ? "활성" : "비활성"}
+                        {gate.isActive ? '활성' : '비활성'}
                       </span>
                     </td>
                     <td>
                       <label className="label cursor-pointer justify-start gap-2 py-0">
                         <input
                           type="checkbox"
-                          className="toggle toggle-xs border-slate-500 bg-slate-300 text-slate-700 checked:border-indigo-600 checked:bg-indigo-600"
+                          className="toggle toggle-xs border-base-content/20 bg-base-300 text-slate-700 checked:border-primary checked:bg-primary"
                           checked={gate.isActive}
                           disabled={togglePendingGateId === gate.id}
-                          onChange={(e) => onToggleActive(gate.id, e.target.checked)}
+                          onChange={(e) =>
+                            onToggleActive(gate.id, e.target.checked)
+                          }
                         />
                       </label>
                     </td>
@@ -99,18 +105,18 @@ export function RaidGateList({
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          className="btn btn-xs btn-outline border-slate-300"
+                          className="btn btn-xs btn-outline border-base-300"
                           onClick={() => onEdit(gate)}
                         >
                           수정
                         </button>
                         <button
                           type="button"
-                          className="btn btn-xs btn-outline border-rose-300 text-rose-700"
+                          className="btn btn-xs btn-outline border-error/40 text-error"
                           onClick={() => confirmDelete(gate.id)}
                           disabled={deletePendingGateId === gate.id}
                         >
-                          {deletePendingGateId === gate.id ? "삭제 중" : "삭제"}
+                          {deletePendingGateId === gate.id ? '삭제 중' : '삭제'}
                         </button>
                       </div>
                     </td>

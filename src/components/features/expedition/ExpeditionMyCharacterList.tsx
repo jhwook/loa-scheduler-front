@@ -1,21 +1,25 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ExpeditionCharacterCard } from "@/components/features/expedition/ExpeditionCharacterCard";
+import { ExpeditionCharacterCard } from '@/components/features/expedition/ExpeditionCharacterCard';
 import {
   postCharacterRefresh,
   postCharactersRefreshAll,
-} from "@/lib/api/characters-refresh";
-import { getMyCharacters } from "@/lib/api/expedition";
-import { useRefreshCooldown } from "@/hooks/useRefreshCooldown";
-import { ApiError } from "@/types/api";
-import type { MySavedCharacter } from "@/types/expedition";
+} from '@/lib/api/characters-refresh';
+import { getCharactersDashboard } from '@/lib/api/expedition';
+import { useRefreshCooldown } from '@/hooks/useRefreshCooldown';
+import { ApiError } from '@/types/api';
+import {
+  mapDashboardCharacterToMySaved,
+  type CharacterDashboardRow,
+  type CharactersDashboardResponse,
+} from '@/types/expedition';
 
 function RefreshAllSpinner({ className }: { className?: string }) {
   return (
     <svg
-      className={`animate-spin ${className ?? "h-4 w-4"}`}
+      className={`animate-spin ${className ?? 'h-4 w-4'}`}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -38,24 +42,29 @@ function RefreshAllSpinner({ className }: { className?: string }) {
   );
 }
 
-function parseItemAvgLevel(level: string): number {
-  const n = parseFloat(String(level).replace(/,/g, "").trim());
+function parseItemAvgLevel(level: string | null | undefined): number {
+  const n = parseFloat(
+    String(level ?? '')
+      .replace(/,/g, '')
+      .trim()
+  );
   return Number.isFinite(n) ? n : 0;
 }
 
 function groupByServerSorted(
-  list: MySavedCharacter[],
-): Map<string, MySavedCharacter[]> {
-  const map = new Map<string, MySavedCharacter[]>();
+  list: CharacterDashboardRow[]
+): Map<string, CharacterDashboardRow[]> {
+  const map = new Map<string, CharacterDashboardRow[]>();
   for (const c of list) {
-    const prev = map.get(c.serverName) ?? [];
+    const key = c.serverName?.trim() ? c.serverName : '';
+    const prev = map.get(key) ?? [];
     prev.push(c);
-    map.set(c.serverName, prev);
+    map.set(key, prev);
   }
   for (const [name, chars] of map) {
     const sorted = [...chars].sort(
       (a, b) =>
-        parseItemAvgLevel(b.itemAvgLevel) - parseItemAvgLevel(a.itemAvgLevel),
+        parseItemAvgLevel(b.itemAvgLevel) - parseItemAvgLevel(a.itemAvgLevel)
     );
     map.set(name, sorted);
   }
@@ -63,15 +72,16 @@ function groupByServerSorted(
 }
 
 export function ExpeditionMyCharacterList() {
-  const [rows, setRows] = useState<MySavedCharacter[]>([]);
+  const [dashboard, setDashboard] =
+    useState<CharactersDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshingIds, setRefreshingIds] = useState<Set<number>>(
-    () => new Set(),
+    () => new Set()
   );
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [toast, setToast] = useState<{
-    kind: "ok" | "err";
+    kind: 'ok' | 'err';
     text: string;
   } | null>(null);
 
@@ -81,22 +91,29 @@ export function ExpeditionMyCharacterList() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getMyCharacters();
-      setRows(data);
+      const data = await getCharactersDashboard();
+      setDashboard(data);
     } catch (err) {
-      let msg = "캐릭터 목록을 불러오지 못했습니다.";
+      let msg = '캐릭터 목록을 불러오지 못했습니다.';
       if (err instanceof ApiError) msg = err.message;
       else if (err instanceof Error) msg = err.message;
       setError(msg);
-      setRows([]);
+      setDashboard(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const refreshListQuiet = useCallback(async () => {
-    const data = await getMyCharacters();
-    setRows(data);
+  const refreshDashboardQuiet = useCallback(async () => {
+    try {
+      const data = await getCharactersDashboard();
+      setDashboard(data);
+    } catch (err) {
+      let msg = '목록 갱신에 실패했습니다.';
+      if (err instanceof ApiError) msg = err.message;
+      else if (err instanceof Error) msg = err.message;
+      setToast({ kind: 'err', text: msg });
+    }
   }, []);
 
   useEffect(() => {
@@ -107,9 +124,9 @@ export function ExpeditionMyCharacterList() {
     const refresh = () => {
       void load();
     };
-    window.addEventListener("expedition-characters-synced", refresh);
+    window.addEventListener('expedition-characters-synced', refresh);
     return () => {
-      window.removeEventListener("expedition-characters-synced", refresh);
+      window.removeEventListener('expedition-characters-synced', refresh);
     };
   }, [load]);
 
@@ -125,13 +142,13 @@ export function ExpeditionMyCharacterList() {
       try {
         await postCharacterRefresh(id);
         cooldown.startCharCooldown(id);
-        await refreshListQuiet();
-        setToast({ kind: "ok", text: "캐릭터 정보를 갱신했습니다." });
+        await refreshDashboardQuiet();
+        setToast({ kind: 'ok', text: '캐릭터 정보를 갱신했습니다.' });
       } catch (err) {
-        let msg = "새로고침에 실패했습니다.";
+        let msg = '새로고침에 실패했습니다.';
         if (err instanceof ApiError) msg = err.message;
         else if (err instanceof Error) msg = err.message;
-        setToast({ kind: "err", text: msg });
+        setToast({ kind: 'err', text: msg });
       } finally {
         setRefreshingIds((prev) => {
           const next = new Set(prev);
@@ -140,7 +157,7 @@ export function ExpeditionMyCharacterList() {
         });
       }
     },
-    [cooldown, refreshListQuiet],
+    [cooldown, refreshDashboardQuiet]
   );
 
   const handleRefreshAll = useCallback(async () => {
@@ -148,28 +165,28 @@ export function ExpeditionMyCharacterList() {
     try {
       const r = await postCharactersRefreshAll();
       cooldown.startAllCooldown();
-      await refreshListQuiet();
+      await refreshDashboardQuiet();
       setToast({
-        kind: "ok",
+        kind: 'ok',
         text: `전체 새로고침 완료 (성공 ${r.successCount}건, 실패 ${r.failureCount}건)`,
       });
     } catch (err) {
-      let msg = "전체 새로고침에 실패했습니다.";
+      let msg = '전체 새로고침에 실패했습니다.';
       if (err instanceof ApiError) msg = err.message;
       else if (err instanceof Error) msg = err.message;
-      setToast({ kind: "err", text: msg });
+      setToast({ kind: 'err', text: msg });
     } finally {
       setRefreshingAll(false);
     }
-  }, [cooldown, refreshListQuiet]);
+  }, [cooldown, refreshDashboardQuiet]);
 
+  const rows = dashboard?.characters ?? [];
+  const totalCharacterCount = dashboard?.totalCharacterCount ?? 0;
   const grouped = useMemo(() => groupByServerSorted(rows), [rows]);
   const serverEntries = useMemo(() => [...grouped.entries()], [grouped]);
 
   const allButtonDisabled =
-    refreshingAll ||
-    cooldown.allRemainingSec > 0 ||
-    refreshingIds.size > 0;
+    refreshingAll || cooldown.allRemainingSec > 0 || refreshingIds.size > 0;
 
   if (loading) {
     return (
@@ -213,9 +230,9 @@ export function ExpeditionMyCharacterList() {
         <div
           role="status"
           className={
-            toast.kind === "ok"
-              ? "fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-lg"
-              : "fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 shadow-lg"
+            toast.kind === 'ok'
+              ? 'fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-lg'
+              : 'fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 shadow-lg'
           }
         >
           {toast.text}
@@ -224,8 +241,10 @@ export function ExpeditionMyCharacterList() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-slate-800">
-          내 캐릭터{" "}
-          <span className="font-normal text-slate-500">({rows.length}명)</span>
+          내 캐릭터{' '}
+          <span className="font-normal text-slate-500">
+            ({totalCharacterCount}명)
+          </span>
         </h2>
         <button
           type="button"
@@ -234,7 +253,7 @@ export function ExpeditionMyCharacterList() {
           title={
             cooldown.allRemainingSec > 0 && !refreshingAll
               ? `${cooldown.allRemainingSec}초 후 다시 시도`
-              : "모든 캐릭터 정보 새로고침"
+              : '모든 캐릭터 정보 새로고침'
           }
           className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -251,20 +270,32 @@ export function ExpeditionMyCharacterList() {
       </div>
 
       {serverEntries.map(([serverName, chars]) => (
-        <section key={serverName}>
+        <section key={serverName || '__none'}>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {serverName}{" "}
+            {serverName.trim() ? serverName : '서버 미지정'}{' '}
             <span className="font-normal text-slate-400">({chars.length})</span>
           </h3>
           <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(254px,1fr))]">
             {chars.map((c) => (
               <ExpeditionCharacterCard
                 key={c.id}
-                character={c}
+                character={mapDashboardCharacterToMySaved(c)}
+                weeklyRaids={c.weeklyRaids}
+                weeklyGoldTotal={c.weeklyGoldTotal}
+                weeklyBoundGoldTotal={c.weeklyBoundGoldTotal}
+                reloadDashboard={() => void refreshDashboardQuiet()}
                 isRefreshing={refreshingIds.has(c.id)}
                 onRefresh={() => void handleRefreshOne(c.id)}
                 cooldownRemainingSec={cooldown.charRemainingSec(c.id)}
                 refreshLocked={refreshingAll}
+                onCharacterDeleted={({ message }) => {
+                  void refreshDashboardQuiet();
+                  setToast({
+                    kind: 'ok',
+                    text: message?.trim() ?? '캐릭터가 삭제되었습니다.',
+                  });
+                }}
+                onDeleteFailed={(msg) => setToast({ kind: 'err', text: msg })}
               />
             ))}
           </div>

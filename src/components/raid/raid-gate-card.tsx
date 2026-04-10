@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-import type { RaidGateDetail } from "@/types/raid";
+import type { RaidGateDetail } from '@/types/raid';
 
 type Props = {
   gate: RaidGateDetail;
@@ -26,7 +26,7 @@ export function RaidGateCard({
   const baseGold = usesBoundGold ? gate.boundGold : gate.rewardGold;
   const finalGold = Math.max(
     0,
-    baseGold - (extraSelected && gate.canExtraReward ? gate.extraRewardCost : 0),
+    baseGold - (extraSelected && gate.canExtraReward ? gate.extraRewardCost : 0)
   );
   const [displayGold, setDisplayGold] = useState(finalGold);
 
@@ -52,38 +52,42 @@ export function RaidGateCard({
   return (
     <label
       className={`card cursor-pointer border ${
-        selected ? "border-indigo-500 bg-slate-800/90" : "border-slate-700 bg-slate-900/70"
+        selected
+          ? 'border-primary bg-base-300/90'
+          : 'border-base-300 bg-base-200/70'
       }`}
     >
-      <div
-        className={`card-body gap-2 ${compact ? "gap-1.5 p-2" : "p-3"}`}
-      >
+      <div className={`card-body gap-2 ${compact ? 'gap-1.5 p-2' : 'p-3'}`}>
         <div
-          className={`flex items-start justify-between ${compact ? "gap-1.5" : "gap-3"}`}
+          className={`flex items-start justify-between ${compact ? 'gap-1.5' : 'gap-3'}`}
         >
           <div className="min-w-0">
             <p
-              className={`font-bold text-slate-100 ${compact ? "truncate text-base" : "text-2xl"}`}
+              className={`font-bold text-base-content ${compact ? 'truncate text-base' : 'text-2xl'}`}
             >
               {gate.gateName}
             </p>
-            <p className={`text-slate-400 ${compact ? "text-[10px]" : "text-xs"}`}>
+            <p
+              className={`text-base-content/60 ${compact ? 'text-[10px]' : 'text-xs'}`}
+            >
               Lv. {gate.minItemLevel}
             </p>
           </div>
           <div className="shrink-0 text-right">
             <p
-              className={`inline-flex flex-wrap items-center justify-end gap-1 font-bold text-amber-300 ${compact ? "text-sm" : "gap-1.5 text-xl"}`}
+              className={`inline-flex flex-wrap items-center justify-end gap-1 font-bold text-amber-300 ${compact ? 'text-sm' : 'gap-1.5 text-xl'}`}
             >
               {usesBoundGold ? (
                 <span
-                  className={`badge badge-warning border-0 font-bold text-slate-900 ${compact ? "badge-xs px-1 py-0.5 text-[9px]" : "badge-xs px-1.5 py-1 text-[10px]"}`}
+                  className={`badge badge-warning border-0 font-bold text-base-content ${compact ? 'badge-xs px-1 py-0.5 text-[9px]' : 'badge-xs px-1.5 py-1 text-[10px]'}`}
                 >
                   귀속
                 </span>
               ) : null}
               {displayGold.toLocaleString()}
-              <span className={compact ? "text-[10px]" : "ml-1 text-sm"}>G</span>
+              <span className={compact ? 'text-[10px]' : 'ml-1 text-sm'}>
+                G
+              </span>
             </p>
           </div>
         </div>
@@ -96,7 +100,7 @@ export function RaidGateCard({
               checked={selected}
               onChange={(e) => onChangeSelected(e.target.checked)}
             />
-            <span className="text-slate-300">선택</span>
+            <span className="text-base-content/80">선택</span>
           </label>
 
           <label className="label min-w-0 shrink-0 cursor-pointer gap-1 p-0 text-[10px] sm:text-xs">
@@ -107,7 +111,7 @@ export function RaidGateCard({
               onChange={(e) => onChangeExtra(e.target.checked)}
               disabled={!selected || !gate.canExtraReward}
             />
-            <span className="text-slate-300">더보기</span>
+            <span className="text-base-content/80">더보기</span>
           </label>
         </div>
       </div>

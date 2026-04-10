@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 
-import { ExpeditionPreviewModal } from "@/components/features/expedition/ExpeditionPreviewModal";
+import { ExpeditionPreviewModal } from '@/components/features/expedition/ExpeditionPreviewModal';
 
 export function ExpeditionAddButton() {
   const [open, setOpen] = useState(false);

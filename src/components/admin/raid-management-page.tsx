@@ -308,7 +308,7 @@ export function RaidManagementPage() {
   }
 
   return (
-    <div className="space-y-4 text-slate-900">
+    <div className="space-y-4 text-base-content">
       {message ? (
         <div className="pointer-events-none fixed left-1/2 top-4 z-[200] -translate-x-1/2">
           <div
@@ -340,10 +340,10 @@ export function RaidManagementPage() {
         </div>
 
         <div className="space-y-4 lg:col-span-8">
-          <div className="rounded-xl border border-slate-200 bg-white/70 p-3 text-sm text-slate-600">
+          <div className="rounded-xl border border-base-300 bg-base-200/80 p-3 text-sm text-base-content/70">
             {selectedRaid ? (
               <p>
-                선택한 레이드: <strong className="text-slate-800">{selectedRaid.raidName}</strong>
+                선택한 레이드: <strong className="text-base-content">{selectedRaid.raidName}</strong>
               </p>
             ) : (
               <p>좌측 레이드 목록에서 레이드를 선택해 주세요.</p>

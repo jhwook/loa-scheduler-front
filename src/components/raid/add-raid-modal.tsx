@@ -184,7 +184,7 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
           <motion.button
             type="button"
-            className="absolute inset-0 bg-slate-900/70"
+            className="absolute inset-0 bg-base-200/70"
             aria-label="닫기"
             onClick={onClose}
             initial={{ opacity: 0 }}
@@ -193,17 +193,17 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
             transition={{ duration: 0.18, ease: "easeOut" }}
           />
           <motion.div
-            className="relative z-10 flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
+            className="relative z-10 flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-200 text-base-content shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-        <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-base-300 px-5 py-4">
           <div>
             <h3 className="text-2xl font-bold">레이드 숙제 등록</h3>
-            <p className="mt-1 text-sm text-slate-300">
+            <p className="mt-1 text-sm text-base-content/80">
               레이드와 관문을 선택해주세요
             </p>
           </div>
@@ -218,7 +218,7 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <div>
-            <p className="mb-2 text-sm font-semibold text-slate-300">레이드 선택</p>
+            <p className="mb-2 text-sm font-semibold text-base-content/80">레이드 선택</p>
             <div className="flex flex-wrap gap-2">
               {raids.map((r) => {
                 const selected = raidId === r.id;
@@ -231,7 +231,7 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
                     className={`btn btn-sm rounded-full ${
                       selected
                         ? "btn-primary"
-                        : "border border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                        : "border border-base-300 bg-base-300 text-base-content hover:bg-base-300"
                     }`}
                   >
                     {r.raidName}
@@ -242,7 +242,7 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
           </div>
 
           {loadingDetail ? (
-            <div className="py-10 text-center text-slate-300">
+            <div className="py-10 text-center text-base-content/80">
               레이드 정보 불러오는 중...
             </div>
           ) : detail ? (
@@ -285,13 +285,13 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
                   />
                 ))
               ) : (
-                <div className="rounded-lg border border-slate-700 bg-slate-800/60 px-4 py-6 text-center text-sm text-slate-300">
+                <div className="rounded-lg border border-base-300 bg-base-300/60 px-4 py-6 text-center text-sm text-base-content/80">
                   해당 레이드는 이미 모든 관문이 등록되어 있습니다.
                 </div>
               )}
             </div>
           ) : (
-            <div className="py-10 text-center text-slate-300">
+            <div className="py-10 text-center text-base-content/80">
               {raids.length === 0
                 ? '추가 가능한 레이드가 없습니다.'
                 : '레이드를 선택해주세요.'}
@@ -300,7 +300,7 @@ export function AddRaidModal({ open, characterId, onClose, onSaved }: Props) {
           {error ? <div className="alert alert-error">{error}</div> : null}
         </div>
 
-        <div className="flex justify-end border-t border-slate-700 px-5 py-4">
+        <div className="flex justify-end border-t border-base-300 px-5 py-4">
           <button
             type="button"
             className="btn btn-primary min-w-36"

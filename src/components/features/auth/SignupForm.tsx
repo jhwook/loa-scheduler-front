@@ -1,19 +1,20 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState, type FormEvent } from 'react';
 
-import { signupApi } from "@/lib/api/auth";
-import { ApiError } from "@/types/api";
+import { signupApi } from '@/lib/api/auth';
+import { ApiError } from '@/types/api';
 
 const MAX_LEN = 20;
 
 export function SignupForm() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [username, setUsername] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -22,11 +23,16 @@ export function SignupForm() {
     setError(null);
 
     const id = username.trim();
+    const nick = nickname.trim();
     const pw = password;
     const pw2 = passwordConfirm;
 
     if (id.length === 0 || id.length > MAX_LEN) {
       setError(`아이디는 1~${MAX_LEN}자로 입력해 주세요.`);
+      return;
+    }
+    if (nick.length === 0 || nick.length > MAX_LEN) {
+      setError(`닉네임은 1~${MAX_LEN}자로 입력해 주세요.`);
       return;
     }
     if (pw.length === 0 || pw.length > MAX_LEN) {
@@ -38,14 +44,14 @@ export function SignupForm() {
       return;
     }
     if (pw !== pw2) {
-      setError("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+      setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
       return;
     }
 
     setPending(true);
     try {
-      await signupApi({ username: id, password: pw });
-      router.replace("/login");
+      await signupApi({ username: id, nickname: nick, password: pw });
+      router.replace('/login');
       router.refresh();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -53,7 +59,7 @@ export function SignupForm() {
       } else if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError("회원가입에 실패했습니다.");
+        setError('회원가입에 실패했습니다.');
       }
     } finally {
       setPending(false);
@@ -63,19 +69,19 @@ export function SignupForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      className="w-full max-w-sm space-y-4 rounded-2xl border border-base-300 bg-base-200 p-6 shadow-sm"
     >
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-slate-900">회원가입</h1>
-        <p className="text-xs text-slate-500">
-          아이디와 비밀번호를 입력한 뒤 가입을 완료하세요.
+        <h1 className="text-lg font-semibold text-base-content">회원가입</h1>
+        <p className="text-xs text-base-content/60">
+          아이디, 닉네임, 비밀번호를 입력한 뒤 가입을 완료하세요.
         </p>
       </div>
 
       <div className="flex w-full flex-col gap-1.5">
         <label
           htmlFor="signup-username"
-          className="text-xs font-medium text-slate-600"
+          className="text-xs font-medium text-base-content/70"
         >
           아이디
         </label>
@@ -88,7 +94,30 @@ export function SignupForm() {
           maxLength={MAX_LEN}
           value={username}
           onChange={(e) => setUsername(e.target.value.slice(0, MAX_LEN))}
-          className="input input-bordered w-full border-slate-200 bg-white text-sm"
+          className="input input-bordered w-full border-base-300 bg-base-100 text-sm"
+        />
+        <p className="text-[11px] leading-relaxed text-slate-400">
+          최대 {MAX_LEN}자
+        </p>
+      </div>
+
+      <div className="flex w-full flex-col gap-1.5">
+        <label
+          htmlFor="signup-nickname"
+          className="text-xs font-medium text-base-content/70"
+        >
+          닉네임
+        </label>
+        <input
+          id="signup-nickname"
+          type="text"
+          name="nickname"
+          autoComplete="nickname"
+          required
+          maxLength={MAX_LEN}
+          value={nickname}
+          onChange={(e) => setNickname(e.target.value.slice(0, MAX_LEN))}
+          className="input input-bordered w-full border-base-300 bg-base-100 text-sm"
         />
         <p className="text-[11px] leading-relaxed text-slate-400">
           최대 {MAX_LEN}자
@@ -98,7 +127,7 @@ export function SignupForm() {
       <div className="flex w-full flex-col gap-1.5">
         <label
           htmlFor="signup-password"
-          className="text-xs font-medium text-slate-600"
+          className="text-xs font-medium text-base-content/70"
         >
           비밀번호
         </label>
@@ -110,7 +139,7 @@ export function SignupForm() {
           maxLength={MAX_LEN}
           value={password}
           onChange={(e) => setPassword(e.target.value.slice(0, MAX_LEN))}
-          className="input input-bordered w-full border-slate-200 bg-white text-sm"
+          className="input input-bordered w-full border-base-300 bg-base-100 text-sm"
         />
         <p className="text-[11px] leading-relaxed text-slate-400">
           최대 {MAX_LEN}자
@@ -120,7 +149,7 @@ export function SignupForm() {
       <div className="flex w-full flex-col gap-1.5">
         <label
           htmlFor="signup-password-confirm"
-          className="text-xs font-medium text-slate-600"
+          className="text-xs font-medium text-base-content/70"
         >
           비밀번호 확인
         </label>
@@ -131,10 +160,8 @@ export function SignupForm() {
           required
           maxLength={MAX_LEN}
           value={passwordConfirm}
-          onChange={(e) =>
-            setPasswordConfirm(e.target.value.slice(0, MAX_LEN))
-          }
-          className="input input-bordered w-full border-slate-200 bg-white text-sm"
+          onChange={(e) => setPasswordConfirm(e.target.value.slice(0, MAX_LEN))}
+          className="input input-bordered w-full border-base-300 bg-base-100 text-sm"
         />
         <p className="text-[11px] leading-relaxed text-slate-400">
           최대 {MAX_LEN}자
@@ -142,7 +169,7 @@ export function SignupForm() {
       </div>
 
       {error ? (
-        <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-xs text-error">
           {error}
         </p>
       ) : null}
@@ -153,7 +180,7 @@ export function SignupForm() {
           disabled={pending}
           className="btn btn-neutral flex-1 rounded-xl"
         >
-          {pending ? "가입 중…" : "가입하기"}
+          {pending ? '가입 중…' : '가입하기'}
         </button>
         <Link
           href="/login"

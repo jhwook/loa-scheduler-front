@@ -88,16 +88,27 @@ export async function loginApi(credentials: LoginRequest): Promise<LoginResponse
 }
 
 const SIGNUP_PATH = "/auth/signup";
+const LOGOUT_PATH = "/auth/logout";
 
 /**
- * POST {BASE_URL}/auth/signup — body: { username, password }
+ * POST {BASE_URL}/auth/signup — body: { username, nickname, password }
  */
 export async function signupApi(payload: SignupRequest): Promise<void> {
   await apiFetch<unknown>(SIGNUP_PATH, {
     method: "POST",
     json: {
       username: payload.username,
+      nickname: payload.nickname,
       password: payload.password,
     },
+  });
+}
+
+/**
+ * POST {BASE_URL}/auth/logout
+ */
+export async function logoutApi(): Promise<void> {
+  await apiFetch<unknown>(LOGOUT_PATH, {
+    method: "POST",
   });
 }

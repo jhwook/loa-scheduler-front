@@ -1,13 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AddRaidModal } from '@/components/raid/add-raid-modal';
 import { EditWeeklyRaidModal } from '@/components/raid/edit-weekly-raid-modal';
-import {
-  getCharacterWeeklyRaids,
-  patchCharacterWeeklyRaidClear,
-} from '@/lib/api/raid';
+import { deleteCharacter } from '@/lib/api/expedition';
+import { patchCharacterWeeklyRaidClear } from '@/lib/api/raid';
 import { getClassIconSrc, resolveClassIconBasename } from '@/lib/class-icon';
 import { ApiError } from '@/types/api';
 import type { MySavedCharacter } from '@/types/expedition';
@@ -15,11 +13,21 @@ import type { CharacterWeeklyRaidItem } from '@/types/raid';
 
 type Props = {
   character: MySavedCharacter;
+  /** GET /characters/dashboard 에서 내려준 주간 레이드 행 */
+  weeklyRaids: CharacterWeeklyRaidItem[];
+  weeklyGoldTotal: number;
+  weeklyBoundGoldTotal: number;
+  /** 레이드 추가·편집 등 목록이 바뀐 뒤 대시보드 재조회 */
+  reloadDashboard: () => void;
   isRefreshing: boolean;
   onRefresh: () => void;
   cooldownRemainingSec: number;
   /** 전체 새로고침 등으로 개별 버튼을 잠글 때 */
   refreshLocked: boolean;
+  /** 삭제 성공 후 목록 갱신·토스트 등 */
+  onCharacterDeleted: (result: { message?: string }) => void;
+  /** 삭제 실패 시 메시지 표시용 */
+  onDeleteFailed: (message: string) => void;
 };
 
 function InlineSpinner({ className }: { className?: string }) {
@@ -91,9 +99,9 @@ function difficultyBadgeClass(difficulty: string): string {
     return 'border-rose-400/60 bg-rose-600 text-white';
   }
   if (difficulty.includes('노말') || difficulty.includes('1단계')) {
-    return 'border-slate-500 bg-slate-700 text-white';
+    return 'border-neutral bg-neutral text-neutral-content';
   }
-  return 'border-slate-500 bg-slate-700 text-white';
+  return 'border-neutral bg-neutral text-neutral-content';
 }
 
 /**
@@ -101,15 +109,23 @@ function difficultyBadgeClass(difficulty: string): string {
  */
 export function ExpeditionCharacterCard({
   character: c,
+  weeklyRaids: weeklyRaidsProp,
+  weeklyGoldTotal,
+  weeklyBoundGoldTotal,
+  reloadDashboard,
   isRefreshing,
   onRefresh,
   cooldownRemainingSec,
   refreshLocked,
+  onCharacterDeleted,
+  onDeleteFailed,
 }: Props) {
   const [imageFailed, setImageFailed] = useState(false);
   const [classIconFailed, setClassIconFailed] = useState(false);
   const [raidModalOpen, setRaidModalOpen] = useState(false);
-  const [weeklyRaids, setWeeklyRaids] = useState<CharacterWeeklyRaidItem[]>([]);
+  const [weeklyRaids, setWeeklyRaids] = useState<CharacterWeeklyRaidItem[]>(
+    () => weeklyRaidsProp
+  );
   const [editModalRaidId, setEditModalRaidId] = useState<number | null>(null);
   const [editModalRaidName, setEditModalRaidName] = useState('');
   const [pendingClearIds, setPendingClearIds] = useState<Set<number>>(
@@ -123,7 +139,7 @@ export function ExpeditionCharacterCard({
   const classMark = (c.characterClassName?.[0] ?? '?').toUpperCase();
   const classIconBasename = useMemo(
     () => resolveClassIconBasename(c.characterClassName),
-    [c.characterClassName],
+    [c.characterClassName]
   );
   const classIconSrc = classIconBasename
     ? getClassIconSrc(classIconBasename)
@@ -132,27 +148,38 @@ export function ExpeditionCharacterCard({
   useEffect(() => {
     setClassIconFailed(false);
   }, [classIconSrc]);
+  useEffect(() => {
+    setImageFailed(false);
+  }, [src]);
 
   const refreshDisabled =
-    isRefreshing ||
-    cooldownRemainingSec > 0 ||
-    refreshLocked;
+    isRefreshing || cooldownRemainingSec > 0 || refreshLocked;
 
-  const loadWeeklyRaids = useCallback(async () => {
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (deleting || refreshLocked) return;
+    const ok = window.confirm(
+      `「${c.characterName}」 캐릭터를 원정대에서 삭제할까요?\n삭제 후 되돌릴 수 없습니다.`
+    );
+    if (!ok) return;
+    setDeleting(true);
     try {
-      const rows = await getCharacterWeeklyRaids(c.id);
-      setWeeklyRaids(rows);
+      const res = await deleteCharacter(c.id);
+      onCharacterDeleted({ message: res.message });
     } catch (err) {
-      // 카드 UI는 에러를 조용히 무시하고 빈 상태로 표시
-      if (err instanceof ApiError || err instanceof Error) {
-        setWeeklyRaids([]);
-      }
+      let msg = '캐릭터 삭제에 실패했습니다.';
+      if (err instanceof ApiError) msg = err.message;
+      else if (err instanceof Error) msg = err.message;
+      onDeleteFailed(msg);
+    } finally {
+      setDeleting(false);
     }
-  }, [c.id]);
+  }
 
   useEffect(() => {
-    void loadWeeklyRaids();
-  }, [loadWeeklyRaids]);
+    setWeeklyRaids(weeklyRaidsProp);
+  }, [weeklyRaidsProp]);
 
   const raidGroups = useMemo(() => {
     const map = new Map<
@@ -185,27 +212,16 @@ export function ExpeditionCharacterCard({
       .sort((a, b) => a.orderNo - b.orderNo);
   }, [weeklyRaids]);
 
-  const totalGold = useMemo(() => {
-    return weeklyRaids.reduce(
-      (acc, row) => {
-        const extraCost = row.isExtraRewardSelected
-          ? (row.extraRewardCostSnapshot ??
-            row.raidGateInfo.extraRewardCost ??
-            0)
-          : 0;
-        const normalGold = Math.max(0, row.raidGateInfo.rewardGold - extraCost);
-        const boundGold = Math.max(0, row.raidGateInfo.boundGold);
-        return {
-          normal: acc.normal + normalGold,
-          bound: acc.bound + boundGold,
-        };
-      },
-      { normal: 0, bound: 0 }
-    );
-  }, [weeklyRaids]);
+  const totalGold = useMemo(
+    () => ({
+      normal: weeklyGoldTotal,
+      bound: weeklyBoundGoldTotal,
+    }),
+    [weeklyGoldTotal, weeklyBoundGoldTotal]
+  );
 
   const clearGoldProgress = useMemo(() => {
-    return weeklyRaids.reduce(
+    const fromRaids = weeklyRaids.reduce(
       (acc, row) => {
         const extraCost = row.isExtraRewardSelected
           ? (row.extraRewardCostSnapshot ??
@@ -222,7 +238,12 @@ export function ExpeditionCharacterCard({
       },
       { current: 0, total: 0 }
     );
-  }, [weeklyRaids]);
+    const cap = weeklyGoldTotal + weeklyBoundGoldTotal;
+    return {
+      current: fromRaids.current,
+      total: cap > 0 ? cap : fromRaids.total,
+    };
+  }, [weeklyRaids, weeklyGoldTotal, weeklyBoundGoldTotal]);
 
   const clearGoldProgressPercent = useMemo(() => {
     if (clearGoldProgress.total <= 0) return 0;
@@ -284,13 +305,13 @@ export function ExpeditionCharacterCard({
   const editModalWeeklyRows = useMemo(() => {
     if (!editModalRaidId) return [];
     return weeklyRaids.filter(
-      (row) => row.raidGateInfo.raidInfo.id === editModalRaidId,
+      (row) => row.raidGateInfo.raidInfo.id === editModalRaidId
     );
   }, [editModalRaidId, weeklyRaids]);
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-950 shadow-sm">
-      <div className="relative aspect-[3/4] w-full shrink-0 bg-slate-100">
+    <article className="flex h-full flex-col overflow-hidden rounded-xl border border-base-300 bg-base-300 shadow-sm">
+      <div className="relative aspect-[3/4] w-full shrink-0 bg-base-200">
         {showImage ? (
           // eslint-disable-next-line @next/next/no-img-element -- 외부/가변 도메인 URL 대응
           <img
@@ -300,56 +321,85 @@ export function ExpeditionCharacterCard({
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-200 via-slate-100 to-slate-300">
-            <span className="select-none text-5xl font-bold text-slate-400/90">
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-base-300 via-base-200 to-base-300">
+            <span className="select-none text-5xl font-bold text-base-content/60/90">
               {(c.characterName[0] ?? '?').toUpperCase()}
             </span>
           </div>
         )}
-        <span className="absolute left-2 top-2 z-[1] max-w-[calc(100%-4rem)] truncate rounded-md bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+        <span className="absolute left-2 top-2 z-[1] max-w-[calc(100%-5.5rem)] truncate rounded-md bg-base-200/85 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
           {c.serverName}
         </span>
-        <button
-          type="button"
-          aria-label="캐릭터 새로고침"
-          title={
-            cooldownRemainingSec > 0 && !isRefreshing
-              ? `${cooldownRemainingSec}초 후 다시 시도`
-              : '캐릭터 정보 새로고침'
-          }
-          disabled={refreshDisabled}
-          onClick={onRefresh}
-          className="absolute right-2 top-2 z-10 flex min-h-8 min-w-8 items-center justify-center gap-0.5 rounded-md border border-slate-600/80 bg-slate-900/90 px-1.5 text-slate-100 shadow backdrop-blur-sm disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isRefreshing ? (
-            <InlineSpinner className="h-3.5 w-3.5 text-slate-100" />
-          ) : (
-            <svg
-              className="h-3.5 w-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-          )}
-          {cooldownRemainingSec > 0 && !isRefreshing ? (
-            <span className="text-[9px] font-semibold tabular-nums">
-              {cooldownRemainingSec}s
-            </span>
-          ) : null}
-        </button>
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+          <button
+            type="button"
+            aria-label="캐릭터 새로고침"
+            title={
+              cooldownRemainingSec > 0 && !isRefreshing
+                ? `${cooldownRemainingSec}초 후 다시 시도`
+                : '캐릭터 정보 새로고침'
+            }
+            disabled={refreshDisabled || deleting}
+            onClick={onRefresh}
+            className="flex h-7 min-w-7 items-center justify-center gap-0.5 rounded-md border border-base-300/80 bg-base-200/90 px-1 text-base-content shadow backdrop-blur-sm disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isRefreshing ? (
+              <InlineSpinner className="h-3 w-3 text-base-content" />
+            ) : (
+              <svg
+                className="h-3 w-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            )}
+            {cooldownRemainingSec > 0 && !isRefreshing ? (
+              <span className="text-[9px] font-semibold tabular-nums">
+                {cooldownRemainingSec}s
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            aria-label="캐릭터 삭제"
+            title="원정대에서 삭제"
+            disabled={deleting || refreshLocked || isRefreshing}
+            onClick={() => void handleDelete()}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-rose-500/70 bg-rose-950/90 text-rose-400 shadow backdrop-blur-sm hover:bg-rose-900/95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deleting ? (
+              <InlineSpinner className="h-3 w-3 text-rose-300" />
+            ) : (
+              <svg
+                className="h-3.5 w-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
-      <div className="border-t border-slate-800 bg-slate-900 px-3 py-2.5">
+      <div className="border-t border-base-300 bg-base-200 px-3 py-2.5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-500 bg-slate-800 text-[12px] font-bold text-slate-100">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-base-content/20 bg-base-300 text-[12px] font-bold text-base-content">
             {classIconSrc && !classIconFailed ? (
               // eslint-disable-next-line @next/next/no-img-element -- public 정적 직업 아이콘
               <img
@@ -363,73 +413,74 @@ export function ExpeditionCharacterCard({
             )}
           </div>
           <div className="min-w-0">
-            <h3 className="truncate text-[clamp(14px,1.15vw,17px)] font-bold leading-tight text-slate-100">
+            <h3 className="truncate text-[clamp(14px,1.15vw,17px)] font-bold leading-tight text-base-content">
               {c.characterName}
             </h3>
-            <p className="mt-0.5 truncate text-[clamp(11px,0.9vw,13px)] text-slate-300">
+            <p className="mt-0.5 truncate text-[clamp(11px,0.9vw,13px)] text-base-content/80">
               <span>{c.serverName}</span>
-              <span className="mx-1.5 text-slate-500">/</span>
+              <span className="mx-1.5 text-base-content/60">/</span>
               <span>Lv.{lvText}</span>
-              <span className="mx-1.5 text-slate-500">/</span>
+              <span className="mx-1.5 text-base-content/60">/</span>
               <span className="font-semibold text-rose-400">
                 {c.combatPower}
               </span>
             </p>
-            <p className="mt-1 text-[clamp(9px,0.75vw,10px)] text-slate-500">
-              최근 업데이트:{' '}
-              <RelativeLastSynced at={c.lastSyncedAt} />
+            <p className="mt-1 text-[clamp(9px,0.75vw,10px)] text-base-content/60">
+              최근 업데이트: <RelativeLastSynced at={c.lastSyncedAt} />
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col bg-slate-950">
-        <div className="border-t border-slate-800 bg-slate-900 px-3 py-3">
-          <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-2.5">
+      <div className="flex flex-1 flex-col bg-base-300">
+        {/* 일일 / 주간 UI (추후 연동 시 복구)
+        <div className="border-t border-base-300 bg-base-200 px-3 py-3">
+          <div className="rounded-lg border border-base-300 bg-base-300/80 p-2.5">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-semibold text-slate-300">일일</p>
+              <p className="text-xs font-semibold text-base-content/80">일일</p>
               <div className="flex items-center gap-1.5">
-                <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] text-slate-300">
+                <span className="rounded-md border border-base-300 bg-base-300 px-2 py-1 text-[11px] text-base-content/80">
                   가던
                 </span>
-                <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] text-slate-300">
+                <span className="rounded-md border border-base-300 bg-base-300 px-2 py-1 text-[11px] text-base-content/80">
                   가토
                 </span>
-                <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] text-slate-300">
+                <span className="rounded-md border border-base-300 bg-base-300 px-2 py-1 text-[11px] text-base-content/80">
                   +
                 </span>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-slate-300">주간</p>
+              <p className="text-xs font-semibold text-base-content/80">주간</p>
               <div className="flex items-center gap-1.5">
-                <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] text-slate-300">
+                <span className="rounded-md border border-base-300 bg-base-300 px-2 py-1 text-[11px] text-base-content/80">
                   천상
                 </span>
-                <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] text-slate-300">
+                <span className="rounded-md border border-base-300 bg-base-300 px-2 py-1 text-[11px] text-base-content/80">
                   혈석
                 </span>
-                <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] text-slate-300">
+                <span className="rounded-md border border-base-300 bg-base-300 px-2 py-1 text-[11px] text-base-content/80">
                   싱글
                 </span>
-                <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] text-slate-300">
+                <span className="rounded-md border border-base-300 bg-base-300 px-2 py-1 text-[11px] text-base-content/80">
                   +
                 </span>
               </div>
             </div>
           </div>
         </div>
+        */}
 
-        <div className="border-t border-slate-800 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3 py-3">
+        <div className="border-t border-base-300 bg-gradient-to-r from-base-200 via-base-300 to-base-200 px-3 py-3">
           <p className="flex items-end justify-center gap-1 text-[clamp(12px,0.95vw,14px)] font-bold text-amber-300">
             <span className="inline-flex items-center">
               {animatedCurrentClearGold.toLocaleString()}
             </span>
-            <span className="font-medium text-slate-300">
+            <span className="font-medium text-base-content/80">
               / {clearGoldProgress.total.toLocaleString()} G
             </span>
           </p>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-700">
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-base-content/20">
             <div
               className="h-full rounded-full bg-amber-400 transition-all duration-300"
               style={{ width: `${clearGoldProgressPercent}%` }}
@@ -437,12 +488,14 @@ export function ExpeditionCharacterCard({
           </div>
         </div>
 
-        <div className="border-t border-slate-800 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3 py-3">
-          <div className="flex items-center justify-between border-b border-slate-700 pb-2">
-            <p className="text-[clamp(13px,1vw,15px)] font-semibold text-indigo-300">레이드</p>
+        <div className="border-t border-base-300 bg-gradient-to-r from-base-200 via-base-300 to-base-200 px-3 py-3">
+          <div className="flex items-center justify-between border-b border-base-300 pb-2">
+            <p className="text-[clamp(13px,1vw,15px)] font-semibold text-primary">
+              레이드
+            </p>
             <button
               type="button"
-              className="rounded-md border border-slate-600 bg-slate-800/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200"
+              className="rounded-md border border-base-300 bg-base-300/70 px-2 py-0.5 text-[11px] font-semibold text-base-content"
               onClick={() => setRaidModalOpen(true)}
             >
               레이드 추가
@@ -450,8 +503,8 @@ export function ExpeditionCharacterCard({
           </div>
 
           {raidGroups.length === 0 ? (
-            <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-5 text-center">
-              <p className="text-[15px] font-medium text-slate-400">
+            <div className="mt-3 rounded-xl border border-base-300 bg-base-300/80 px-3 py-5 text-center">
+              <p className="text-[15px] font-medium text-base-content/60">
                 레이드 없음
               </p>
             </div>
@@ -460,17 +513,17 @@ export function ExpeditionCharacterCard({
               {raidGroups.map((group, idx) => (
                 <div
                   key={group.raidName}
-                  className={idx === 0 ? '' : 'border-t border-slate-800 pt-3'}
+                  className={idx === 0 ? '' : 'border-t border-base-300 pt-3'}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-[clamp(11px,0.9vw,13px)] font-semibold text-slate-100">
+                        <p className="truncate text-[clamp(11px,0.9vw,13px)] font-semibold text-base-content">
                           {group.raidName}
                         </p>
                         <button
                           type="button"
-                          className="btn btn-ghost btn-xs min-h-0 h-6 w-6 shrink-0 p-0 text-slate-300"
+                          className="btn btn-ghost btn-xs min-h-0 h-6 w-6 shrink-0 p-0 text-base-content/80"
                           onClick={() => {
                             setEditModalRaidId(group.raidId);
                             setEditModalRaidName(group.raidName);
@@ -496,7 +549,9 @@ export function ExpeditionCharacterCard({
                             }, 0)
                             .toLocaleString()}
                         </span>
-                        <span className="ml-1 text-[clamp(10px,0.8vw,11px)]">G</span>
+                        <span className="ml-1 text-[clamp(10px,0.8vw,11px)]">
+                          G
+                        </span>
                       </p>
                     </div>
                     <div className="flex items-end gap-1.5">
@@ -517,7 +572,7 @@ export function ExpeditionCharacterCard({
                             className={`indicator relative flex h-10 w-10 items-center justify-center rounded-md border text-[clamp(13px,1vw,16px)] font-semibold ${
                               row.isCleared
                                 ? 'border-emerald-500 bg-emerald-900/40 text-emerald-200'
-                                : 'border-slate-700 bg-slate-950 text-slate-200'
+                                : 'border-base-300 bg-base-300 text-base-content'
                             } ${pendingClearIds.has(row.id) ? 'opacity-60' : ''}`}
                             onClick={() => toggleClear(row.id)}
                             disabled={pendingClearIds.has(row.id)}
@@ -525,7 +580,7 @@ export function ExpeditionCharacterCard({
                           >
                             {row.raidGateInfo.gateNumber}
                             {row.isExtraRewardSelected ? (
-                              <span className="badge badge-xs badge-outline indicator-item border-emerald-500 bg-slate-900 px-1.5 text-[10px] leading-none text-emerald-400">
+                              <span className="badge badge-xs badge-outline indicator-item border-emerald-500 bg-base-200 px-1.5 text-[10px] leading-none text-emerald-400">
                                 +
                               </span>
                             ) : null}
@@ -537,15 +592,15 @@ export function ExpeditionCharacterCard({
                 </div>
               ))}
 
-              <div className="flex items-end justify-between border-t border-slate-800 pt-2">
+              <div className="flex items-end justify-between border-t border-base-300 pt-2">
                 <span className="text-[clamp(13px,1vw,16px)] font-bold text-amber-300">
                   합계
                 </span>
                 <div className="inline-flex items-end gap-2 text-[clamp(12px,0.95vw,14px)] font-bold text-amber-300">
                   <span>{totalGold.normal.toLocaleString()} G</span>
-                  <span className="text-slate-500">/</span>
+                  <span className="text-base-content/60">/</span>
                   <span className="inline-flex flex-col items-start">
-                    <span className="badge badge-warning mb-0.5 h-4 min-h-4 rounded-full px-1 text-[8px] leading-none text-slate-900">
+                    <span className="badge badge-warning mb-0.5 h-4 min-h-4 rounded-full px-1 text-[8px] leading-none text-base-content">
                       귀속
                     </span>
                     <span>{totalGold.bound.toLocaleString()} G</span>
@@ -561,7 +616,7 @@ export function ExpeditionCharacterCard({
         characterId={c.id}
         onClose={() => setRaidModalOpen(false)}
         onSaved={() => {
-          void loadWeeklyRaids();
+          reloadDashboard();
         }}
       />
       <EditWeeklyRaidModal
@@ -576,7 +631,7 @@ export function ExpeditionCharacterCard({
           setEditModalRaidName('');
         }}
         onSaved={() => {
-          void loadWeeklyRaids();
+          reloadDashboard();
         }}
       />
     </article>

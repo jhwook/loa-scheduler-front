@@ -225,7 +225,7 @@ export function EditWeeklyRaidModal({
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
           <motion.button
             type="button"
-            className="absolute inset-0 bg-slate-900/70"
+            className="absolute inset-0 bg-base-200/70"
             onClick={onClose}
             aria-label="닫기"
             initial={{ opacity: 0 }}
@@ -234,17 +234,17 @@ export function EditWeeklyRaidModal({
             transition={{ duration: 0.18, ease: "easeOut" }}
           />
           <motion.div
-            className="relative z-10 flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-100"
+            className="relative z-10 flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-200 text-base-content"
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-        <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-base-300 px-5 py-4">
           <div>
             <h3 className="text-2xl font-bold">레이드 숙제 수정</h3>
-            <p className="mt-1 text-sm text-slate-300">{raidName}</p>
+            <p className="mt-1 text-sm text-base-content/80">{raidName}</p>
           </div>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
             ✕
@@ -253,7 +253,7 @@ export function EditWeeklyRaidModal({
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {loading ? (
-            <div className="py-10 text-center text-slate-300">불러오는 중...</div>
+            <div className="py-10 text-center text-base-content/80">불러오는 중...</div>
           ) : detail ? (
             <div className="space-y-5">
               {detail.difficulties.map((section) => (
@@ -294,12 +294,12 @@ export function EditWeeklyRaidModal({
               ))}
             </div>
           ) : (
-            <div className="py-10 text-center text-slate-300">등록된 레이드가 없습니다.</div>
+            <div className="py-10 text-center text-base-content/80">등록된 레이드가 없습니다.</div>
           )}
           {error ? <div className="alert alert-error">{error}</div> : null}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-700 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 px-5 py-4">
           <button
             type="button"
             className="btn btn-outline btn-error btn-sm sm:btn-md"
@@ -330,7 +330,7 @@ export function EditWeeklyRaidModal({
         <div className="fixed inset-0 z-[170] flex items-center justify-center p-4">
           <motion.button
             type="button"
-            className="absolute inset-0 bg-slate-950/80"
+            className="absolute inset-0 bg-base-300/80"
             aria-label="닫기"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -346,7 +346,7 @@ export function EditWeeklyRaidModal({
             aria-modal="true"
             aria-labelledby="raid-delete-confirm-title"
             aria-describedby="raid-delete-confirm-desc"
-            className="relative z-10 w-full max-w-md rounded-2xl border border-slate-600 bg-slate-900 p-5 text-slate-100 shadow-2xl"
+            className="relative z-10 w-full max-w-md rounded-2xl border border-base-300 bg-base-200 p-5 text-base-content shadow-2xl"
             initial={{ opacity: 0, scale: 0.96, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
@@ -355,20 +355,20 @@ export function EditWeeklyRaidModal({
           >
             <h4
               id="raid-delete-confirm-title"
-              className="text-lg font-bold text-slate-100"
+              className="text-lg font-bold text-base-content"
             >
               레이드 숙제 삭제
             </h4>
             <p
               id="raid-delete-confirm-desc"
-              className="mt-3 text-sm leading-relaxed text-slate-300"
+              className="mt-3 text-sm leading-relaxed text-base-content/80"
             >
               <span className="font-semibold text-amber-200/90">
                 &quot;{raidName}&quot;
               </span>
               {" "}레이드 숙제를 모두 삭제할까요?
               <br />
-              <span className="text-slate-400">
+              <span className="text-base-content/60">
                 이 레이드에 등록된 모든 관문이 제거됩니다.
               </span>
             </p>

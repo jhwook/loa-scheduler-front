@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from 'next/link';
 
 /** 추후 API KEY 발급 가이드 콘텐츠로 채웁니다. */
 export default function LostarkApiKeyGuidePage() {

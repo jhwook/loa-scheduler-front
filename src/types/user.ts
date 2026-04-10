@@ -6,14 +6,27 @@ export type RegisterLostarkApiKeyRequest = {
 export type MeResponse = {
   id?: number;
   username?: string;
+  nickname?: string | null;
+  profileImageUrl?: string | null;
   hasApiToken?: boolean | string | number | null;
   role?: string;
   roles?: string[];
   isAdmin?: boolean;
   user?: {
+    nickname?: string | null;
+    profileImageUrl?: string | null;
     role?: string;
     roles?: string[];
     isAdmin?: boolean;
     hasApiToken?: boolean | string | number | null;
   };
+};
+
+export type UpdateMyProfileRequest = {
+  nickname: string;
+};
+
+export type CheckNicknameResponse = {
+  available: boolean;
+  message?: string;
 };

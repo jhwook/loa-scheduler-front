@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-import type { RaidInfo, UpdateRaidRequest } from "@/types/raid";
+import type { RaidInfo, UpdateRaidRequest } from '@/types/raid';
 
 type Props = {
   open: boolean;
@@ -18,7 +18,13 @@ type FormState = {
   isActive: boolean;
 };
 
-export function EditRaidModal({ open, raid, pending, onClose, onSubmit }: Props) {
+export function EditRaidModal({
+  open,
+  raid,
+  pending,
+  onClose,
+  onSubmit,
+}: Props) {
   const [state, setState] = useState<FormState | null>(null);
 
   useEffect(() => {
@@ -46,7 +52,7 @@ export function EditRaidModal({ open, raid, pending, onClose, onSubmit }: Props)
 
   return (
     <div className="modal modal-open">
-      <div className="modal-box max-w-lg bg-white text-slate-900">
+      <div className="modal-box max-w-lg bg-base-200 text-base-content">
         <h3 className="text-lg font-semibold">레이드 수정</h3>
         <div className="mt-4 grid gap-3">
           <label className="form-control gap-2">
@@ -55,10 +61,12 @@ export function EditRaidModal({ open, raid, pending, onClose, onSubmit }: Props)
             </div>
             <input
               type="text"
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={state.raidName}
               onChange={(e) =>
-                setState((prev) => (prev ? { ...prev, raidName: e.target.value } : prev))
+                setState((prev) =>
+                  prev ? { ...prev, raidName: e.target.value } : prev
+                )
               }
               maxLength={30}
             />
@@ -70,10 +78,12 @@ export function EditRaidModal({ open, raid, pending, onClose, onSubmit }: Props)
             <input
               type="number"
               min={1}
-              className="input input-bordered input-sm border-slate-400 bg-white pl-4 text-slate-900"
+              className="input input-bordered input-sm border-base-300 bg-base-200 pl-4 text-base-content"
               value={state.orderNo}
               onChange={(e) =>
-                setState((prev) => (prev ? { ...prev, orderNo: Number(e.target.value) } : prev))
+                setState((prev) =>
+                  prev ? { ...prev, orderNo: Number(e.target.value) } : prev
+                )
               }
             />
           </label>
@@ -83,18 +93,29 @@ export function EditRaidModal({ open, raid, pending, onClose, onSubmit }: Props)
               className="toggle toggle-sm toggle-primary"
               checked={state.isActive}
               onChange={(e) =>
-                setState((prev) => (prev ? { ...prev, isActive: e.target.checked } : prev))
+                setState((prev) =>
+                  prev ? { ...prev, isActive: e.target.checked } : prev
+                )
               }
             />
             <span className="label-text text-slate-700">활성화</span>
           </label>
         </div>
         <div className="modal-action">
-          <button type="button" className="btn btn-ghost text-slate-700" onClick={onClose}>
+          <button
+            type="button"
+            className="btn btn-ghost text-slate-700"
+            onClick={onClose}
+          >
             취소
           </button>
-          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={pending}>
-            {pending ? "저장 중..." : "저장"}
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={pending}
+          >
+            {pending ? '저장 중...' : '저장'}
           </button>
         </div>
       </div>

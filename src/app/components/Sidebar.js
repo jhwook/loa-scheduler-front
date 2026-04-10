@@ -1,20 +1,20 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export default function Sidebar() {
   const pathname = usePathname();
 
   const isActive = (href) => {
-    if (href === "/dashboard") {
-      return pathname === "/" || pathname.startsWith("/dashboard");
+    if (href === '/dashboard') {
+      return pathname === '/' || pathname.startsWith('/dashboard');
     }
     return pathname.startsWith(href);
   };
 
   const itemBaseClasses =
-    "w-full gap-4 rounded-lg px-5 py-2.5 text-sm transition-colors";
+    'w-full gap-4 rounded-lg px-5 py-2.5 text-sm transition-colors';
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white/80 px-5 py-6 shadow-sm lg:flex lg:flex-col">
@@ -40,10 +40,10 @@ export default function Sidebar() {
               href="/dashboard"
               className={
                 itemBaseClasses +
-                " rounded-xl " +
-                (isActive("/dashboard")
-                  ? "active bg-slate-800/95 text-slate-50 px-6"
-                  : "text-slate-700 hover:bg-slate-100")
+                ' rounded-xl ' +
+                (isActive('/dashboard')
+                  ? 'active bg-slate-800/95 text-slate-50 px-6'
+                  : 'text-slate-700 hover:bg-slate-100')
               }
             >
               <div>
@@ -63,9 +63,9 @@ export default function Sidebar() {
               href="/raidschedule"
               className={
                 itemBaseClasses +
-                (isActive("/raidschedule")
-                  ? " active bg-slate-800/95 text-slate-50"
-                  : " text-slate-700 hover:bg-slate-100")
+                (isActive('/raidschedule')
+                  ? ' active bg-slate-800/95 text-slate-50'
+                  : ' text-slate-700 hover:bg-slate-100')
               }
             >
               <div className="flex h-9 w-9 items-center justify-center text-sm">
@@ -85,9 +85,9 @@ export default function Sidebar() {
               href="/expedition"
               className={
                 itemBaseClasses +
-                (isActive("/expedition")
-                  ? " active bg-slate-800/95 text-slate-50"
-                  : " text-slate-700 hover:bg-slate-100")
+                (isActive('/expedition')
+                  ? ' active bg-slate-800/95 text-slate-50'
+                  : ' text-slate-700 hover:bg-slate-100')
               }
             >
               <div className="flex h-9 w-9 items-center justify-center text-sm">
@@ -107,9 +107,9 @@ export default function Sidebar() {
               href="/party"
               className={
                 itemBaseClasses +
-                (isActive("/party")
-                  ? " active bg-slate-800/95 text-slate-50"
-                  : " text-slate-700 hover:bg-slate-100")
+                (isActive('/party')
+                  ? ' active bg-slate-800/95 text-slate-50'
+                  : ' text-slate-700 hover:bg-slate-100')
               }
             >
               <div className="flex h-9 w-9 items-center justify-center text-sm">
@@ -129,9 +129,9 @@ export default function Sidebar() {
               href="/admin/raids"
               className={
                 itemBaseClasses +
-                (isActive("/admin/raids")
-                  ? " active bg-slate-800/95 text-slate-50"
-                  : " text-slate-700 hover:bg-slate-100")
+                (isActive('/admin/raids')
+                  ? ' active bg-slate-800/95 text-slate-50'
+                  : ' text-slate-700 hover:bg-slate-100')
               }
             >
               <div className="flex h-9 w-9 items-center justify-center text-sm">
@@ -154,4 +154,3 @@ export default function Sidebar() {
     </aside>
   );
 }
-

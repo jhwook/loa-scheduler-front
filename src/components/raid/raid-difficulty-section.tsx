@@ -21,9 +21,9 @@ function difficultyBadgeClass(difficulty: string): string {
     return "border-rose-400/70 bg-rose-600 text-white";
   }
   if (difficulty.includes("노말") || difficulty.includes("1단계")) {
-    return "border-slate-500 bg-slate-700 text-white";
+    return "border-neutral bg-neutral text-neutral-content";
   }
-  return "border-slate-500 bg-slate-700 text-white";
+  return "border-neutral bg-neutral text-neutral-content";
 }
 
 export function RaidDifficultySection({
@@ -43,7 +43,7 @@ export function RaidDifficultySection({
 
   return (
     <section className="space-y-2.5">
-      <h4 className="flex items-center gap-2 text-lg font-semibold text-slate-200">
+      <h4 className="flex items-center gap-2 text-lg font-semibold text-base-content">
         <span className={`badge badge-sm border ${difficultyBadgeClass(section.difficulty)}`}>
           {section.difficulty}
         </span>

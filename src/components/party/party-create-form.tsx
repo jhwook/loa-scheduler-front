@@ -37,7 +37,7 @@ export function PartyCreateForm({
       <div>
         <label
           htmlFor="party-create-name"
-          className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400"
+          className="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/60"
         >
           공격대 이름
         </label>
@@ -49,13 +49,13 @@ export function PartyCreateForm({
           required
           maxLength={80}
           placeholder="예: 주말 격추 공대"
-          className="input input-bordered w-full border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-500"
+          className="input input-bordered w-full border-base-300 bg-base-200 text-sm text-base-content placeholder:text-base-content/60"
         />
       </div>
       <div>
         <label
           htmlFor="party-create-desc"
-          className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400"
+          className="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/60"
         >
           설명 (선택)
         </label>
@@ -66,13 +66,13 @@ export function PartyCreateForm({
           rows={3}
           maxLength={500}
           placeholder="모집 조건, 일정 등을 적어 두세요."
-          className="textarea textarea-bordered w-full resize-none border-slate-600 bg-slate-900 text-sm text-slate-100 placeholder:text-slate-500"
+          className="textarea textarea-bordered w-full resize-none border-base-300 bg-base-200 text-sm text-base-content placeholder:text-base-content/60"
         />
       </div>
       <div className="flex flex-wrap justify-end gap-2 pt-2">
         <button
           type="button"
-          className="btn btn-ghost btn-sm text-slate-300"
+          className="btn btn-ghost btn-sm text-base-content/80"
           onClick={onCancel}
           disabled={isSubmitting}
         >
@@ -80,7 +80,7 @@ export function PartyCreateForm({
         </button>
         <button
           type="submit"
-          className="btn btn-primary btn-sm text-slate-950"
+          className="btn btn-primary btn-sm text-primary-content"
           disabled={isSubmitting || !name.trim()}
         >
           {isSubmitting ? "생성 중…" : "생성"}

@@ -1,4 +1,4 @@
-import Sidebar from "../components/Sidebar";
+import Sidebar from '../components/Sidebar';
 
 export default function RaidSchedulePage() {
   return (
@@ -26,8 +26,8 @@ export default function RaidSchedulePage() {
                 레이드 일정 영역
               </p>
               <p className="text-base font-medium text-slate-800">
-                추후 길드/파티별 레이드 캘린더, 신청 카드, 완료 체크 등을
-                이 영역에 구성하면 됩니다.
+                추후 길드/파티별 레이드 캘린더, 신청 카드, 완료 체크 등을 이
+                영역에 구성하면 됩니다.
               </p>
             </div>
           </div>
@@ -36,4 +36,3 @@ export default function RaidSchedulePage() {
     </div>
   );
 }
-

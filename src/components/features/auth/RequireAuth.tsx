@@ -27,7 +27,7 @@ export function RequireAuth({ children }: Props) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-base-content/60">
         인증 확인 중…
       </div>
     );

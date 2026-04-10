@@ -1,5 +1,8 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
+  CharacterDashboardRow,
+  CharactersDashboardResponse,
+  DeleteCharacterResponse,
   ExpeditionPreviewCharacter,
   MyCharactersListResponse,
   MySavedCharacter,
@@ -63,4 +66,42 @@ export async function getMyCharacters(): Promise<MySavedCharacter[]> {
     return [];
   }
   return data.characters;
+}
+
+const CHARACTERS_DASHBOARD_PATH = "/characters/dashboard";
+
+/**
+ * GET {BASE_URL}/characters/dashboard
+ * 원정대 탭용 캐릭터·주간 레이드·골드 요약 일괄 조회
+ */
+export async function getCharactersDashboard(): Promise<CharactersDashboardResponse> {
+  const data = await apiFetch<CharactersDashboardResponse>(
+    CHARACTERS_DASHBOARD_PATH,
+    { method: "GET" },
+  );
+  const raw = Array.isArray(data?.characters) ? data.characters : [];
+  const characters: CharacterDashboardRow[] = raw.map((row) => ({
+    ...row,
+    weeklyRaids: Array.isArray(row.weeklyRaids) ? row.weeklyRaids : [],
+  }));
+  return {
+    totalCharacterCount: data?.totalCharacterCount ?? 0,
+    totalWeeklyGold: data?.totalWeeklyGold ?? 0,
+    totalWeeklyBoundGold: data?.totalWeeklyBoundGold ?? 0,
+    characters,
+  };
+}
+
+const CHARACTER_PATH = (characterId: number) => `/characters/${characterId}`;
+
+/**
+ * DELETE {BASE_URL}/characters/:characterId
+ * Authorization: Bearer — `client.ts`에서 자동 첨부
+ */
+export async function deleteCharacter(
+  characterId: number,
+): Promise<DeleteCharacterResponse> {
+  return apiFetch<DeleteCharacterResponse>(CHARACTER_PATH(characterId), {
+    method: "DELETE",
+  });
 }

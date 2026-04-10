@@ -59,7 +59,7 @@ export function RequireAdmin({ children }: Props) {
 
   if (state === "checking") {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-base-content/60">
         관리자 권한 확인 중…
       </div>
     );

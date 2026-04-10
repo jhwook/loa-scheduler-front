@@ -19,9 +19,9 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ko">
+    <html lang="ko" data-theme="dim">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-base-100 text-base-content min-h-screen antialiased`}
       >
         <AppMotionProvider>{children}</AppMotionProvider>
       </body>

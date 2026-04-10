@@ -1,6 +1,6 @@
-import Sidebar from "@/app/components/Sidebar";
-import { RaidManagementPage } from "@/components/admin/raid-management-page";
-import { RequireAdmin } from "@/components/features/auth/RequireAdmin";
+import Sidebar from '@/app/components/Sidebar';
+import { RaidManagementPage } from '@/components/admin/raid-management-page';
+import { RequireAdmin } from '@/components/features/auth/RequireAdmin';
 
 export default function AdminRaidsPage() {
   return (

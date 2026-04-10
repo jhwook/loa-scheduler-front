@@ -17,5 +17,6 @@ export type LoginResponse = {
 /** 회원가입 API 요청 (POST /auth/signup) */
 export type SignupRequest = {
   username: string;
+  nickname: string;
   password: string;
 };

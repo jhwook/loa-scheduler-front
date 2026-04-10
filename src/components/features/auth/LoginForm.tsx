@@ -70,11 +70,11 @@ export function LoginForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      className="w-full max-w-sm space-y-4 rounded-2xl border border-base-300 bg-base-200 p-6 shadow-sm"
     >
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-slate-900">로그인</h1>
-        <p className="text-xs text-slate-500">
+        <h1 className="text-lg font-semibold text-base-content">로그인</h1>
+        <p className="text-xs text-base-content/60">
           계정으로 로그인하면 원정대 설정으로 이동합니다.
         </p>
       </div>
@@ -82,7 +82,7 @@ export function LoginForm() {
       <div className="flex w-full flex-col gap-1.5">
         <label
           htmlFor="login-username"
-          className="text-xs font-medium text-slate-600"
+          className="text-xs font-medium text-base-content/70"
         >
           아이디
         </label>
@@ -95,9 +95,9 @@ export function LoginForm() {
           maxLength={MAX_LEN}
           value={username}
           onChange={(e) => setUsername(e.target.value.slice(0, MAX_LEN))}
-          className="input input-bordered w-full border-slate-200 bg-white text-sm"
+          className="input input-bordered w-full border-base-300 bg-base-100 text-sm"
         />
-        <p className="text-[11px] leading-relaxed text-slate-400">
+        <p className="text-[11px] leading-relaxed text-base-content/50">
           최대 {MAX_LEN}자
         </p>
       </div>
@@ -105,7 +105,7 @@ export function LoginForm() {
       <div className="flex w-full flex-col gap-1.5">
         <label
           htmlFor="login-password"
-          className="text-xs font-medium text-slate-600"
+          className="text-xs font-medium text-base-content/70"
         >
           비밀번호
         </label>
@@ -117,15 +117,15 @@ export function LoginForm() {
           maxLength={MAX_LEN}
           value={password}
           onChange={(e) => setPassword(e.target.value.slice(0, MAX_LEN))}
-          className="input input-bordered w-full border-slate-200 bg-white text-sm"
+          className="input input-bordered w-full border-base-300 bg-base-100 text-sm"
         />
-        <p className="text-[11px] leading-relaxed text-slate-400">
+        <p className="text-[11px] leading-relaxed text-base-content/50">
           최대 {MAX_LEN}자
         </p>
       </div>
 
       {error ? (
-        <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-xs text-error">
           {error}
         </p>
       ) : null}
@@ -140,7 +140,7 @@ export function LoginForm() {
         </button>
         <Link
           href="/signup"
-          className="btn btn-outline flex-1 rounded-xl border-slate-300"
+          className="btn btn-outline flex-1 rounded-xl border-base-300"
         >
           회원가입
         </Link>
