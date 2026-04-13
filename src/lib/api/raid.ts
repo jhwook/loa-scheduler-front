@@ -18,16 +18,44 @@ import type {
 const ADMIN_RAIDS_PATH = "/raid-info/admin/raids";
 const ADMIN_GATES_PATH = "/raid-info/admin/gates";
 
-type RaidListResponse = RaidInfo[] | { raids?: RaidInfo[]; data?: RaidInfo[] };
+type RaidListResponse =
+  | unknown[]
+  | { raids?: unknown[]; data?: unknown[] };
 type RaidGateListResponse =
   | RaidGateInfo[]
   | { raidGates?: RaidGateInfo[]; gates?: RaidGateInfo[]; data?: RaidGateInfo[] };
 
-function extractRaidList(raw: RaidListResponse): RaidInfo[] {
+function extractRaidListRaw(raw: RaidListResponse): unknown[] {
   if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw.raids)) return raw.raids;
-  if (Array.isArray(raw.data)) return raw.data;
+  if (raw && typeof raw === "object" && Array.isArray(raw.raids)) return raw.raids;
+  if (raw && typeof raw === "object" && Array.isArray(raw.data)) return raw.data;
   return [];
+}
+
+function asObjectRecord(row: unknown): Record<string, unknown> {
+  return row !== null && typeof row === "object"
+    ? (row as Record<string, unknown>)
+    : {};
+}
+
+/** GET 응답은 snake_case·camelCase 혼용 가능 → RaidInfo로 통일 */
+function mapAdminRaidFromApi(row: unknown): RaidInfo {
+  const r = asObjectRecord(row);
+  const partyRaw = r.partySize ?? r.party_size;
+  let partySize: number | undefined;
+  if (partyRaw !== undefined && partyRaw !== null) {
+    const n = Number(partyRaw);
+    if (n === 4 || n === 8) partySize = n;
+  }
+
+  return {
+    id: Number(r.id),
+    raidName: String(r.raidName ?? r.raid_name ?? ""),
+    description: String(r.description ?? ""),
+    ...(partySize !== undefined ? { partySize } : {}),
+    orderNo: Number(r.orderNo ?? r.order_no ?? 0),
+    isActive: Boolean(r.isActive ?? r.is_active ?? false),
+  };
 }
 
 function extractRaidGateList(raw: RaidGateListResponse): RaidGateInfo[] {
@@ -42,7 +70,7 @@ export async function getAdminRaids(): Promise<RaidInfo[]> {
   const raw = await apiFetch<RaidListResponse>(ADMIN_RAIDS_PATH, {
     method: "GET",
   });
-  return extractRaidList(raw);
+  return extractRaidListRaw(raw).map(mapAdminRaidFromApi);
 }
 
 export async function createRaid(payload: CreateRaidRequest): Promise<void> {

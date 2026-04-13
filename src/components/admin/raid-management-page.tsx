@@ -13,13 +13,15 @@ import {
   updateRaidGate,
 } from "@/lib/api/raid";
 import { ApiError } from "@/types/api";
-import type {
-  CreateRaidGateRequest,
-  CreateRaidRequest,
-  RaidGateInfo,
-  RaidInfo,
-  UpdateRaidRequest,
-  UpdateRaidGateRequest,
+import {
+  formatRaidPartySizeLabel,
+  normalizeRaidPartySize,
+  type CreateRaidGateRequest,
+  type CreateRaidRequest,
+  type RaidGateInfo,
+  type RaidInfo,
+  type UpdateRaidGateRequest,
+  type UpdateRaidRequest,
 } from "@/types/raid";
 
 import { RaidForm } from "./raid-form";
@@ -309,6 +311,15 @@ export function RaidManagementPage() {
 
   return (
     <div className="space-y-4 text-base-content">
+      <div>
+        <h2 className="text-base font-semibold text-base-content">
+          레이드 관리
+        </h2>
+        <p className="mt-1 text-sm text-base-content/60">
+          레이드·관문 정보를 등록하고 활성화합니다.
+        </p>
+      </div>
+
       {message ? (
         <div className="pointer-events-none fixed left-1/2 top-4 z-[200] -translate-x-1/2">
           <div
@@ -343,7 +354,16 @@ export function RaidManagementPage() {
           <div className="rounded-xl border border-base-300 bg-base-200/80 p-3 text-sm text-base-content/70">
             {selectedRaid ? (
               <p>
-                선택한 레이드: <strong className="text-base-content">{selectedRaid.raidName}</strong>
+                선택한 레이드:{" "}
+                <strong className="text-base-content">
+                  {selectedRaid.raidName}
+                </strong>
+                <span className="ml-2 text-base-content/60">
+                  ·{" "}
+                  {formatRaidPartySizeLabel(
+                    normalizeRaidPartySize(selectedRaid.partySize),
+                  )}
+                </span>
               </p>
             ) : (
               <p>좌측 레이드 목록에서 레이드를 선택해 주세요.</p>

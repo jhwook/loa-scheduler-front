@@ -3,6 +3,8 @@
  * API 연동 시 응답 스키마에 맞춰 조정하면 됩니다.
  */
 
+import type { PartyRole } from "@/types/expedition";
+
 export type PartyGroup = {
   id: number;
   name: string;
@@ -48,6 +50,8 @@ export type PartyGroupMemberCharacter = {
   characterLevel?: number;
   /** 전투력 표시 문자열 */
   combatPower?: string | null;
+  /** 파티 역할 (미응답 시 DEALER) */
+  partyRole: PartyRole;
   /** 주간 레이드 숙제 요약 (관문·난이도만) */
   weeklyRaids?: PartyCharacterWeeklyRaidHomework[];
 };

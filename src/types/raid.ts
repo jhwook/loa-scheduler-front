@@ -15,10 +15,25 @@ export type RaidGateInfo = {
   isActive: boolean;
 };
 
+/** 레이드 파티 인원 (raid_info.partySize) */
+export type RaidPartySize = 4 | 8;
+
+export function normalizeRaidPartySize(value: unknown): RaidPartySize {
+  const n = Number(value);
+  if (n === 4) return 4;
+  return 8;
+}
+
+export function formatRaidPartySizeLabel(size: RaidPartySize): string {
+  return size === 4 ? "4인" : "8인";
+}
+
 export type RaidInfo = {
   id: number;
   raidName: string;
   description: string;
+  /** 파티 인원 수 (미응답 시 8) */
+  partySize?: number;
   orderNo: number;
   isActive: boolean;
   raidGates?: RaidGateInfo[];
@@ -27,6 +42,7 @@ export type RaidInfo = {
 export type CreateRaidRequest = {
   raidName: string;
   description: string;
+  partySize: RaidPartySize;
   orderNo: number;
   isActive: boolean;
 };
@@ -124,6 +140,7 @@ export type CharacterWeeklyRaidItem = {
       id: number;
       raidName: string;
       description: string;
+      partySize?: number;
       orderNo: number;
       isActive: boolean;
       createdAt: string;

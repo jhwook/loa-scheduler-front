@@ -1,6 +1,10 @@
 'use client';
 
-import type { RaidInfo } from '@/types/raid';
+import {
+  formatRaidPartySizeLabel,
+  normalizeRaidPartySize,
+  type RaidInfo,
+} from '@/types/raid';
 
 type Props = {
   raids: RaidInfo[];
@@ -52,6 +56,7 @@ export function RaidList({
               <thead className="text-slate-700">
                 <tr>
                   <th>레이드명</th>
+                  <th>인원</th>
                   <th>순서</th>
                   <th>상태</th>
                   <th>활성화</th>
@@ -70,6 +75,11 @@ export function RaidList({
                   >
                     <td className="font-medium text-base-content">
                       {raid.raidName}
+                    </td>
+                    <td className="whitespace-nowrap text-base-content/90">
+                      {formatRaidPartySizeLabel(
+                        normalizeRaidPartySize(raid.partySize),
+                      )}
                     </td>
                     <td>{raid.orderNo}</td>
                     <td>

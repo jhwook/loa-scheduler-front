@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react';
 
-import type { RaidInfo, UpdateRaidRequest } from '@/types/raid';
+import {
+  normalizeRaidPartySize,
+  type RaidInfo,
+  type RaidPartySize,
+  type UpdateRaidRequest,
+} from '@/types/raid';
 
 type Props = {
   open: boolean;
@@ -14,6 +19,7 @@ type Props = {
 
 type FormState = {
   raidName: string;
+  partySize: RaidPartySize;
   orderNo: number;
   isActive: boolean;
 };
@@ -34,6 +40,7 @@ export function EditRaidModal({
     }
     setState({
       raidName: raid.raidName,
+      partySize: normalizeRaidPartySize(raid.partySize),
       orderNo: raid.orderNo,
       isActive: raid.isActive,
     });
@@ -44,6 +51,7 @@ export function EditRaidModal({
   async function handleSave() {
     await onSubmit(raid.id, {
       raidName: state.raidName.trim(),
+      partySize: state.partySize,
       orderNo: Number(state.orderNo),
       isActive: state.isActive,
     });
@@ -70,6 +78,29 @@ export function EditRaidModal({
               }
               maxLength={30}
             />
+          </label>
+          <label className="form-control gap-2">
+            <div className="label py-0">
+              <span className="label-text text-slate-700">파티 인원</span>
+            </div>
+            <select
+              className="select select-bordered select-sm border-base-300 bg-base-200 pl-3 text-base-content"
+              value={state.partySize}
+              onChange={(e) =>
+                setState((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        partySize: Number(e.target.value) === 4 ? 4 : 8,
+                      }
+                    : prev
+                )
+              }
+              aria-label="파티 인원 수"
+            >
+              <option value={4}>4인</option>
+              <option value={8}>8인</option>
+            </select>
           </label>
           <label className="form-control gap-2">
             <div className="label py-0">

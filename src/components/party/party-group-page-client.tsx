@@ -1,16 +1,48 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  pointerWithin,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
 
 import { CharacterClassMark } from '@/components/features/expedition/character-class-mark';
 import { PartyMemberCard } from '@/components/party/party-member-card';
+import { PartyPoolCharacterCard } from '@/components/party/party-pool-character-card';
+import { PartyPoolSortableGrid } from '@/components/party/party-pool-sortable-grid';
+import { CreateRaidPartyButton } from '@/components/raid-party/create-raid-party-button';
+import { CreateRaidPartyModal } from '@/components/raid-party/create-raid-party-modal';
+import { RaidPartyDetailView } from '@/components/raid-party/raid-party-detail-view';
 import {
   cancelPartyGroupInvite,
   createPartyGroupInvite,
   getSentPartyGroupInvites,
 } from '@/lib/api/party-group-invites';
 import {
+  getPartyBuilderCharacters,
   getPartyGroupCharacters,
   leavePartyGroup,
   deletePartyGroup,
@@ -18,17 +50,41 @@ import {
   getPartyGroupMyCharacters,
   putPartyGroupMyCharacters,
 } from '@/lib/api/party-groups';
+import {
+  assignRaidPartySlot,
+  deleteRaidParty,
+  getRaidPartiesByGroup,
+  getRaidPartyById,
+  patchRaidPartyMemberPosition,
+  removeRaidPartyMember,
+} from '@/lib/api/raid-party';
 import { getMe } from '@/lib/api/users';
 import {
   mapPartyGroupCharactersResponseToViewModel,
   getTotalCharacterCount,
 } from '@/lib/party/party-mapper';
+import {
+  mergePartyPoolOrderIds,
+  type PartyPoolOrderedRow,
+} from '@/lib/party-pool-order';
+import {
+  parsePoolCharDndId,
+  parseRaidMemberDndId,
+  parseRaidSlotDndId,
+  poolCharDndId,
+} from '@/lib/party-tab-dnd-ids';
 import { ApiError } from '@/types/api';
 import type {
   PartyGroupDetail,
   PartyGroupMyCharacterItem,
 } from '@/types/party';
 import type { PartySentInviteItem } from '@/types/party-invite';
+import {
+  globalSlotIndexToPartyAndSlot,
+  type RaidPartyDetail,
+  type RaidPartyListItem,
+} from '@/types/raid-party';
+import { normalizePartyRole } from '@/types/expedition';
 
 type Props = {
   groupId: number;
@@ -37,6 +93,13 @@ type Props = {
 type GroupDetailTab = 'status' | 'party' | 'settings';
 type InviteModalTab = 'create' | 'sent';
 type GroupConfirmAction = 'leave' | 'delete';
+
+function partyTabCollisionDetection(
+  args: Parameters<typeof closestCenter>[0],
+) {
+  const hit = pointerWithin(args);
+  return hit.length > 0 ? hit : closestCenter(args);
+}
 
 function parseItemAvgLevelParty(level: string | null | undefined): number {
   const n = parseFloat(
@@ -164,6 +227,40 @@ export function PartyGroupPageClient({ groupId }: Props) {
   const [collapsedPublicCharServers, setCollapsedPublicCharServers] = useState<
     Set<string>
   >(() => new Set());
+  const [raidPartyList, setRaidPartyList] = useState<RaidPartyListItem[]>([]);
+  const [raidPartyDetails, setRaidPartyDetails] = useState<
+    Record<number, RaidPartyDetail>
+  >({});
+  const [raidPartyDetailErrors, setRaidPartyDetailErrors] = useState<
+    Record<number, string>
+  >({});
+  const [raidPartyListLoading, setRaidPartyListLoading] = useState(false);
+  const [raidPartyDetailsLoading, setRaidPartyDetailsLoading] = useState(false);
+  const [raidPartyListError, setRaidPartyListError] = useState<string | null>(
+    null
+  );
+  const [createRaidPartyModalOpen, setCreateRaidPartyModalOpen] =
+    useState(false);
+  /** 공대 캐릭터 풀 정렬 순서 — 저장 시 `@/lib/party-pool-order`의 `buildPartyPoolOrderPayload(partyPoolOrderIds)` 사용 */
+  const [partyPoolOrderIds, setPartyPoolOrderIds] = useState<number[]>([]);
+  const [partyPoolRows, setPartyPoolRows] = useState<PartyPoolOrderedRow[]>(
+    [],
+  );
+  const [partyPoolLoading, setPartyPoolLoading] = useState(false);
+  const [partyPoolError, setPartyPoolError] = useState<string | null>(null);
+  const [partyDndActiveId, setPartyDndActiveId] = useState<string | null>(null);
+  const [raidPartyAssignBusy, setRaidPartyAssignBusy] = useState<
+    Record<number, boolean>
+  >({});
+  const raidPartyAssignFlightRef = useRef<Set<number>>(new Set());
+  const [focusedRaidPartyId, setFocusedRaidPartyId] = useState<number | null>(
+    null,
+  );
+  const [raidPartyDeleteDraft, setRaidPartyDeleteDraft] = useState<{
+    id: number;
+    titleLabel: string;
+  } | null>(null);
+  const [raidPartyDeleteBusy, setRaidPartyDeleteBusy] = useState(false);
 
   const publicCharGrouped = useMemo(
     () => groupPartyMyCharsByServer(publicCharRows),
@@ -199,6 +296,53 @@ export function PartyGroupPageClient({ groupId }: Props) {
     }
   }
 
+  const loadRaidPartyList = useCallback(async () => {
+    if (!group) return;
+    setRaidPartyListLoading(true);
+    setRaidPartyListError(null);
+    try {
+      const list = await getRaidPartiesByGroup(group.id);
+      setRaidPartyList(list);
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '파티 목록을 불러오지 못했습니다.';
+      setRaidPartyListError(msg);
+      setRaidPartyList([]);
+    } finally {
+      setRaidPartyListLoading(false);
+    }
+  }, [group]);
+
+  const loadPartyBuilderPool = useCallback(async () => {
+    if (!Number.isFinite(groupId) || groupId <= 0) return;
+    setPartyPoolLoading(true);
+    setPartyPoolError(null);
+    try {
+      const rows = await getPartyBuilderCharacters(groupId);
+      setPartyPoolRows(rows);
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '파티 편성 캐릭터 목록을 불러오지 못했습니다.';
+      setPartyPoolError(msg);
+      setPartyPoolRows([]);
+    } finally {
+      setPartyPoolLoading(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    if (activeTab !== 'party' || !group) return;
+    void loadPartyBuilderPool();
+  }, [activeTab, group, loadPartyBuilderPool]);
+
   useEffect(() => {
     void loadGroupDetail(true);
   }, [groupId]);
@@ -219,6 +363,262 @@ export function PartyGroupPageClient({ groupId }: Props) {
     () => (group ? getTotalCharacterCount(group) : 0),
     [group]
   );
+
+  const assignCharacterToRaidPartySlot = useCallback(
+    async (
+      raidPartyId: number,
+      slotIndex: number,
+      characterId: number,
+    ): Promise<void> => {
+      if (raidPartyAssignFlightRef.current.has(raidPartyId)) return;
+      raidPartyAssignFlightRef.current.add(raidPartyId);
+      setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: true }));
+      try {
+        const detailSnap = raidPartyDetails[raidPartyId];
+        const listRow = raidPartyList.find((r) => r.id === raidPartyId);
+        const partySize =
+          detailSnap?.partySize ?? listRow?.partySize ?? 8;
+        const { partyNumber, slotNumber } = globalSlotIndexToPartyAndSlot(
+          slotIndex,
+          partySize,
+        );
+        const poolRow = partyPoolRows.find(
+          (r) => r.character.id === characterId,
+        );
+        const positionRole = normalizePartyRole(poolRow?.character.partyRole);
+
+        const updated = await assignRaidPartySlot(raidPartyId, {
+          characterId,
+          partyNumber,
+          slotNumber,
+          positionRole,
+        });
+        setRaidPartyDetails((prev) => ({ ...prev, [raidPartyId]: updated }));
+        setRaidPartyList((list) =>
+          list.map((row) =>
+            row.id === raidPartyId
+              ? { ...row, placedMemberCount: updated.members.length }
+              : row,
+          ),
+        );
+        setToast({ kind: 'ok', text: '파티 슬롯에 배치했습니다.' });
+      } catch (err) {
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : '슬롯 배치에 실패했습니다.';
+        setToast({ kind: 'err', text: msg });
+      } finally {
+        raidPartyAssignFlightRef.current.delete(raidPartyId);
+        setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
+      }
+    },
+    [partyPoolRows, raidPartyDetails, raidPartyList],
+  );
+
+  const moveRaidPartyMemberToSlot = useCallback(
+    async (
+      raidPartyId: number,
+      memberId: number,
+      targetSlotIndex: number,
+    ): Promise<void> => {
+      if (raidPartyAssignFlightRef.current.has(raidPartyId)) return;
+      raidPartyAssignFlightRef.current.add(raidPartyId);
+      setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: true }));
+      try {
+        const detailSnap = raidPartyDetails[raidPartyId];
+        if (!detailSnap) {
+          setToast({ kind: 'err', text: '파티 정보를 불러올 수 없습니다.' });
+          return;
+        }
+        const assignment = detailSnap.members.find(
+          (m) => m.memberId === memberId,
+        );
+        if (!assignment?.memberId) {
+          setToast({
+            kind: 'err',
+            text: '배치 정보가 없어 위치를 바꿀 수 없습니다. 새로고침 후 다시 시도해 주세요.',
+          });
+          return;
+        }
+        if (assignment.slotIndex === targetSlotIndex) return;
+        const partySize =
+          detailSnap.partySize ??
+          raidPartyList.find((r) => r.id === raidPartyId)?.partySize ??
+          8;
+        const { partyNumber, slotNumber } = globalSlotIndexToPartyAndSlot(
+          targetSlotIndex,
+          partySize,
+        );
+        const positionRole = normalizePartyRole(assignment.character.partyRole);
+        const updated = await patchRaidPartyMemberPosition(
+          raidPartyId,
+          memberId,
+          { partyNumber, slotNumber, positionRole },
+        );
+        setRaidPartyDetails((prev) => ({ ...prev, [raidPartyId]: updated }));
+        setRaidPartyList((list) =>
+          list.map((row) =>
+            row.id === raidPartyId
+              ? { ...row, placedMemberCount: updated.members.length }
+              : row,
+          ),
+        );
+        setToast({ kind: 'ok', text: '슬롯 위치를 변경했습니다.' });
+      } catch (err) {
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : '슬롯 이동에 실패했습니다.';
+        setToast({ kind: 'err', text: msg });
+      } finally {
+        raidPartyAssignFlightRef.current.delete(raidPartyId);
+        setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
+      }
+    },
+    [raidPartyDetails, raidPartyList],
+  );
+
+  const removeRaidPartyMemberFromSlot = useCallback(
+    async (raidPartyId: number, memberId: number): Promise<void> => {
+      if (raidPartyAssignFlightRef.current.has(raidPartyId)) return;
+      raidPartyAssignFlightRef.current.add(raidPartyId);
+      setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: true }));
+      try {
+        const updated = await removeRaidPartyMember(raidPartyId, memberId);
+        setRaidPartyDetails((prev) => ({ ...prev, [raidPartyId]: updated }));
+        setRaidPartyList((list) =>
+          list.map((row) =>
+            row.id === raidPartyId
+              ? { ...row, placedMemberCount: updated.members.length }
+              : row,
+          ),
+        );
+        setToast({ kind: 'ok', text: '파티에서 제거했습니다.' });
+      } catch (err) {
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : '파티에서 제거하지 못했습니다.';
+        setToast({ kind: 'err', text: msg });
+      } finally {
+        raidPartyAssignFlightRef.current.delete(raidPartyId);
+        setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
+      }
+    },
+    [],
+  );
+
+  const partyPoolCanonicalIds = useMemo(
+    () => partyPoolRows.map((x) => x.character.id),
+    [partyPoolRows],
+  );
+
+  const partyPoolIdsFingerprint = useMemo(
+    () => [...partyPoolCanonicalIds].sort((a, b) => a - b).join(','),
+    [partyPoolCanonicalIds],
+  );
+
+  const partyPoolCanonicalIdsRef = useRef(partyPoolCanonicalIds);
+  partyPoolCanonicalIdsRef.current = partyPoolCanonicalIds;
+
+  useLayoutEffect(() => {
+    setPartyPoolOrderIds((prev) =>
+      mergePartyPoolOrderIds(prev, partyPoolCanonicalIdsRef.current),
+    );
+  }, [partyPoolIdsFingerprint]);
+
+  const partyTabDndSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const partyDndActiveRow = useMemo(() => {
+    if (!partyDndActiveId) return null;
+    const cid = parsePoolCharDndId(partyDndActiveId);
+    if (cid == null) return null;
+    return partyPoolRows.find((r) => r.character.id === cid) ?? null;
+  }, [partyDndActiveId, partyPoolRows]);
+
+  const partyDndActiveSlotDrag = useMemo(() => {
+    if (!partyDndActiveId) return null;
+    const parsed = parseRaidMemberDndId(partyDndActiveId);
+    if (!parsed) return null;
+    const detail = raidPartyDetails[parsed.raidPartyId];
+    const row = detail?.members.find((m) => m.memberId === parsed.memberId);
+    if (!row) return null;
+    const ownerLabel = row.character.ownerDisplayName?.trim()
+      ? row.character.ownerDisplayName.trim()
+      : '별명 없음';
+    return {
+      ownerLabel,
+      character: row.character,
+    };
+  }, [partyDndActiveId, raidPartyDetails]);
+
+  const handlePartyTabDragStart = useCallback((e: DragStartEvent) => {
+    setPartyDndActiveId(String(e.active.id));
+  }, []);
+
+  const handlePartyTabDragEnd = useCallback(
+    (e: DragEndEvent) => {
+      setPartyDndActiveId(null);
+      const { active, over } = e;
+      if (!over) return;
+
+      const fromMember = parseRaidMemberDndId(active.id);
+      const toSlot = parseRaidSlotDndId(over.id);
+      if (fromMember != null && toSlot != null) {
+        if (fromMember.raidPartyId !== toSlot.raidPartyId) return;
+        void moveRaidPartyMemberToSlot(
+          fromMember.raidPartyId,
+          fromMember.memberId,
+          toSlot.slotIndex,
+        );
+        return;
+      }
+
+      const fromPool = parsePoolCharDndId(active.id);
+      if (fromPool != null && toSlot) {
+        void assignCharacterToRaidPartySlot(
+          toSlot.raidPartyId,
+          toSlot.slotIndex,
+          fromPool,
+        );
+        return;
+      }
+
+      const overPool = parsePoolCharDndId(over.id);
+      if (fromPool != null && overPool != null) {
+        const oldIndex = partyPoolOrderIds.indexOf(fromPool);
+        const newIndex = partyPoolOrderIds.indexOf(overPool);
+        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+        setPartyPoolOrderIds(
+          arrayMove([...partyPoolOrderIds], oldIndex, newIndex),
+        );
+      }
+    },
+    [
+      assignCharacterToRaidPartySlot,
+      moveRaidPartyMemberToSlot,
+      partyPoolOrderIds,
+    ],
+  );
+
+  const handlePartyTabDragCancel = useCallback(() => {
+    setPartyDndActiveId(null);
+  }, []);
+
   const isOwner = useMemo(() => {
     if (!group) return false;
     if (typeof meUserId === 'number' && typeof group.ownerUserId === 'number') {
@@ -236,6 +636,76 @@ export function PartyGroupPageClient({ groupId }: Props) {
     const t = window.setTimeout(() => setToast(null), 3500);
     return () => window.clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (activeTab !== 'party') setCreateRaidPartyModalOpen(false);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'party' || !group) return;
+    void loadRaidPartyList();
+  }, [activeTab, group, loadRaidPartyList]);
+
+  useEffect(() => {
+    if (activeTab !== 'party') {
+      setRaidPartyDetails({});
+      setRaidPartyDetailErrors({});
+      setRaidPartyDetailsLoading(false);
+      return;
+    }
+    if (raidPartyList.length === 0) {
+      setRaidPartyDetails({});
+      setRaidPartyDetailErrors({});
+      setRaidPartyDetailsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRaidPartyDetailsLoading(true);
+    setRaidPartyDetailErrors({});
+    void Promise.allSettled(
+      raidPartyList.map((p) => getRaidPartyById(p.id)),
+    ).then((results) => {
+      if (cancelled) return;
+      const next: Record<number, RaidPartyDetail> = {};
+      const errs: Record<number, string> = {};
+      raidPartyList.forEach((p, i) => {
+        const r = results[i];
+        if (r.status === 'fulfilled') {
+          next[p.id] = r.value;
+        } else {
+          const reason = r.reason;
+          errs[p.id] =
+            reason instanceof ApiError
+              ? reason.message
+              : reason instanceof Error
+                ? reason.message
+                : '파티 정보를 불러오지 못했습니다.';
+        }
+      });
+      setRaidPartyDetails(next);
+      setRaidPartyDetailErrors(errs);
+      setRaidPartyDetailsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, raidPartyList]);
+
+  useEffect(() => {
+    if (activeTab !== 'party') {
+      setFocusedRaidPartyId(null);
+      return;
+    }
+    if (raidPartyList.length === 0) {
+      setFocusedRaidPartyId(null);
+      return;
+    }
+    setFocusedRaidPartyId((prev) =>
+      prev != null && raidPartyList.some((r) => r.id === prev)
+        ? prev
+        : raidPartyList[0]!.id,
+    );
+  }, [activeTab, raidPartyList]);
 
   async function loadSentInvites() {
     setSentLoading(true);
@@ -419,6 +889,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
     try {
       await putPartyGroupMyCharacters(group.id, ids);
       await loadGroupDetail(false);
+      void loadPartyBuilderPool();
       setToast({ kind: 'ok', text: '공개 캐릭터 설정을 저장했습니다.' });
       setPublicCharModalOpen(false);
     } catch (err) {
@@ -584,13 +1055,181 @@ export function PartyGroupPageClient({ groupId }: Props) {
 
       {activeTab === 'party' ? (
         <div className="rounded-2xl border border-base-300 bg-base-300 p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-base-content">파티</h2>
-          <p className="mt-1 text-sm text-base-content/60">
-            파티 편성 UI가 들어갈 영역입니다.
-          </p>
-          <div className="mt-4 rounded-xl border border-dashed border-base-300 bg-base-200/30 px-4 py-10 text-center text-sm text-base-content/60">
-            TODO: (드래그앤드롭) 공대 파티 편성/저장 UI
+          <div className="mb-5 flex flex-col gap-3 border-b border-base-300 pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-base-content">파티</h2>
+              <p className="mt-1 text-sm text-base-content/60">
+                공대 캐릭터는 드래그해 순서를 바꾸거나 파티 슬롯에 놓아 배치할 수
+                있습니다. 슬롯 안 카드는 다른 슬롯으로 옮기거나(덮어쓰면 위치
+                교환), 휴지통으로 파티에서 뺄 수 있습니다. 상단 초록 헤더 영역을
+                눌러 파티를 선택한 뒤{' '}
+                <strong className="text-base-content/75">파티 삭제</strong>
+                로 해당 레이드 파티 전체를 지울 수 있습니다. 공개 캐릭터만 목록에
+                나타납니다.
+              </p>
+            </div>
+            <CreateRaidPartyButton
+              onClick={() => setCreateRaidPartyModalOpen(true)}
+            />
           </div>
+
+          <DndContext
+            sensors={partyTabDndSensors}
+            collisionDetection={partyTabCollisionDetection}
+            onDragStart={handlePartyTabDragStart}
+            onDragEnd={handlePartyTabDragEnd}
+            onDragCancel={handlePartyTabDragCancel}
+          >
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+              <section className="w-full min-w-0 shrink-0 lg:max-w-[24rem] xl:max-w-[26rem]">
+                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-base-content/50">
+                  공대 캐릭터
+                </h3>
+                {partyPoolError ? (
+                  <p className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-3 py-6 text-center text-xs text-rose-100">
+                    {partyPoolError}
+                  </p>
+                ) : partyPoolLoading ? (
+                  <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30">
+                    <span className="flex items-center gap-2 text-xs text-base-content/60">
+                      <span className="loading loading-spinner loading-sm" />
+                      캐릭터 목록 불러오는 중…
+                    </span>
+                  </div>
+                ) : partyPoolRows.length === 0 ? (
+                  <p className="rounded-xl border border-base-300 bg-base-200/40 px-3 py-6 text-center text-xs text-base-content/60">
+                    공개된 캐릭터가 없습니다. 설정 탭에서 공개 캐릭터를 등록해
+                    주세요.
+                  </p>
+                ) : (
+                  <SortableContext
+                    items={partyPoolOrderIds.map(poolCharDndId)}
+                    strategy={rectSortingStrategy}
+                  >
+                    <PartyPoolSortableGrid
+                      rows={partyPoolRows}
+                      orderIds={partyPoolOrderIds}
+                    />
+                  </SortableContext>
+                )}
+              </section>
+
+              <section className="min-w-0 flex-1">
+              {raidPartyListError ? (
+                <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-4 py-6 text-sm text-rose-100">
+                  {raidPartyListError}
+                </div>
+              ) : raidPartyListLoading ? (
+                <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30">
+                  <span className="flex items-center gap-2 text-sm text-base-content/60">
+                    <span className="loading loading-spinner loading-md" />
+                    파티 목록 불러오는 중…
+                  </span>
+                </div>
+              ) : raidPartyList.length === 0 ? (
+                <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30 px-4 py-10 text-center">
+                  <p className="text-sm text-base-content/60">
+                    생성된 파티가 없습니다.
+                  </p>
+                  <p className="mt-1 text-xs text-base-content/45">
+                    상단{' '}
+                    <strong className="text-base-content/70">파티 생성</strong>
+                    으로 레이드를 선택해 주세요.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-4">
+                  {raidPartyList.map((p) => {
+                    const detail = raidPartyDetails[p.id];
+                    const rowErr = raidPartyDetailErrors[p.id];
+                    return (
+                      <div
+                        key={p.id}
+                        className="w-full min-w-[22rem] max-w-xl flex-[1_1_360px]"
+                      >
+                        {raidPartyDetailsLoading && !detail && !rowErr ? (
+                          <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30">
+                            <span className="flex items-center gap-2 text-sm text-base-content/60">
+                              <span className="loading loading-spinner loading-md" />
+                              불러오는 중…
+                            </span>
+                          </div>
+                        ) : rowErr ? (
+                          <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-4 py-6 text-sm text-rose-100">
+                            {rowErr}
+                          </div>
+                        ) : detail ? (
+                          <RaidPartyDetailView
+                            detail={detail}
+                            isPartySelected={focusedRaidPartyId === p.id}
+                            onSelectParty={() => setFocusedRaidPartyId(p.id)}
+                            onAssignToSlot={(slotIndex, characterId) =>
+                              void assignCharacterToRaidPartySlot(
+                                p.id,
+                                slotIndex,
+                                characterId,
+                              )
+                            }
+                            onMoveMemberToSlot={(memberId, targetSlotIndex) =>
+                              void moveRaidPartyMemberToSlot(
+                                p.id,
+                                memberId,
+                                targetSlotIndex,
+                              )
+                            }
+                            onRemoveMember={(memberId) =>
+                              void removeRaidPartyMemberFromSlot(
+                                p.id,
+                                memberId,
+                              )
+                            }
+                            onDeleteRaidParty={() =>
+                              setRaidPartyDeleteDraft({
+                                id: p.id,
+                                titleLabel:
+                                  detail.title?.trim() ||
+                                  detail.raidInfo?.raidName ||
+                                  p.raidName ||
+                                  `파티 #${p.id}`,
+                              })
+                            }
+                            deletePartyDisabled={
+                              raidPartyDeleteBusy ||
+                              (raidPartyAssignBusy[p.id] ?? false)
+                            }
+                            assignmentBusy={
+                              raidPartyAssignBusy[p.id] ?? false
+                            }
+                          />
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              </section>
+            </div>
+            <DragOverlay dropAnimation={null}>
+              {partyDndActiveSlotDrag ? (
+                <div className="cursor-grabbing rounded-lg shadow-2xl ring-2 ring-primary/35 scale-[1.03] rotate-[0.5deg]">
+                  <PartyPoolCharacterCard
+                    memberNickname={partyDndActiveSlotDrag.ownerLabel}
+                    character={partyDndActiveSlotDrag.character}
+                    draggable={false}
+                    variant="slot"
+                  />
+                </div>
+              ) : partyDndActiveRow ? (
+                <div className="cursor-grabbing rounded-lg shadow-2xl ring-2 ring-primary/35 scale-[1.03] rotate-[0.5deg]">
+                  <PartyPoolCharacterCard
+                    memberNickname={partyDndActiveRow.ownerDisplayName}
+                    character={partyDndActiveRow.character}
+                    draggable={false}
+                  />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </div>
       ) : null}
 
@@ -686,6 +1325,90 @@ export function PartyGroupPageClient({ groupId }: Props) {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {raidPartyDeleteDraft ? (
+        <div
+          className="fixed inset-0 z-10000 grid place-items-center bg-base-300/70 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="raid-party-delete-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-base-300 bg-base-200 p-5 shadow-2xl">
+            <h3
+              id="raid-party-delete-title"
+              className="text-base font-semibold text-base-content"
+            >
+              레이드 파티 삭제
+            </h3>
+            <p className="mt-2 text-sm text-base-content/80">
+              <span className="font-medium text-base-content">
+                {raidPartyDeleteDraft.titleLabel}
+              </span>
+              을(를) 삭제할까요? 파티에 배치된 캐릭터도 모두 빠지며, 되돌릴 수
+              없습니다.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm text-base-content/80"
+                disabled={raidPartyDeleteBusy}
+                onClick={() => setRaidPartyDeleteDraft(null)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm border-rose-500/50 bg-rose-950/40 text-error/80 hover:bg-rose-900/60"
+                disabled={raidPartyDeleteBusy}
+                onClick={() => {
+                  const draft = raidPartyDeleteDraft;
+                  if (!draft || raidPartyDeleteBusy) return;
+                  void (async () => {
+                    setRaidPartyDeleteBusy(true);
+                    try {
+                      const result = await deleteRaidParty(draft.id);
+                      raidPartyAssignFlightRef.current.delete(draft.id);
+                      setRaidPartyAssignBusy((prev) => {
+                        const next = { ...prev };
+                        delete next[draft.id];
+                        return next;
+                      });
+                      setRaidPartyDetails((prev) => {
+                        const next = { ...prev };
+                        delete next[draft.id];
+                        return next;
+                      });
+                      setRaidPartyDetailErrors((prev) => {
+                        const next = { ...prev };
+                        delete next[draft.id];
+                        return next;
+                      });
+                      setRaidPartyDeleteDraft(null);
+                      await loadRaidPartyList();
+                      const msg =
+                        result.message?.trim() ||
+                        '공격대 파티가 삭제되었습니다.';
+                      setToast({ kind: 'ok', text: msg });
+                    } catch (err) {
+                      const msg =
+                        err instanceof ApiError
+                          ? err.message
+                          : err instanceof Error
+                            ? err.message
+                            : '파티를 삭제하지 못했습니다.';
+                      setToast({ kind: 'err', text: msg });
+                    } finally {
+                      setRaidPartyDeleteBusy(false);
+                    }
+                  })();
+                }}
+              >
+                {raidPartyDeleteBusy ? '삭제 중…' : '삭제하기'}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1129,6 +1852,18 @@ export function PartyGroupPageClient({ groupId }: Props) {
             )}
           </div>
         </div>
+      ) : null}
+
+      {group ? (
+        <CreateRaidPartyModal
+          open={createRaidPartyModalOpen}
+          groupId={group.id}
+          onClose={() => setCreateRaidPartyModalOpen(false)}
+          onCreated={() => {
+            setToast({ kind: 'ok', text: '파티가 생성되었습니다.' });
+            void loadRaidPartyList();
+          }}
+        />
       ) : null}
 
       {toast ? (

@@ -1,5 +1,12 @@
 import type { CharacterWeeklyRaidItem } from "@/types/raid";
 
+/** 파티 내 역할 (PATCH /characters/:id/party-role) */
+export type PartyRole = "DEALER" | "SUPPORT";
+
+export function normalizePartyRole(value: unknown): PartyRole {
+  return value === "SUPPORT" ? "SUPPORT" : "DEALER";
+}
+
 /** POST /users/me/expedition-preview 응답 항목 */
 export type ExpeditionPreviewCharacter = {
   serverName: string;
@@ -47,6 +54,8 @@ export type MySavedCharacter = {
   lastSyncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** 파티 역할 (미응답 시 DEALER) */
+  partyRole?: PartyRole;
 };
 
 /** GET /characters/dashboard 의 characters[] 항목 */
@@ -65,6 +74,8 @@ export type CharacterDashboardRow = {
   weeklyGoldTotal: number;
   weeklyBoundGoldTotal: number;
   weeklyRaids: CharacterWeeklyRaidItem[];
+  /** 파티 역할 (미응답 시 DEALER) */
+  partyRole?: PartyRole;
 };
 
 /** GET /characters/dashboard 응답 */
@@ -81,6 +92,16 @@ export type DeleteCharacterResponse = {
   deletedCharacter?: {
     id: number;
     characterName: string;
+  };
+};
+
+/** PATCH /characters/:characterId/party-role 응답 */
+export type PatchCharacterPartyRoleResponse = {
+  message?: string;
+  character?: {
+    id: number;
+    characterName: string;
+    partyRole: PartyRole;
   };
 };
 
@@ -106,5 +127,6 @@ export function mapDashboardCharacterToMySaved(
     lastSyncedAt: c.lastSyncedAt,
     createdAt: "",
     updatedAt: "",
+    partyRole: normalizePartyRole(c.partyRole),
   };
 }

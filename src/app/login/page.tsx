@@ -1,17 +1,8 @@
-import Link from 'next/link';
-
-import { LoginForm } from '@/components/features/auth/LoginForm';
+import { LoginForm } from "@/components/features/auth/LoginForm";
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100 text-slate-900">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur md:px-8">
-        <Link href="/" className="text-sm font-semibold text-slate-900">
-          LoA Scheduler
-        </Link>
-        <span className="text-xs text-slate-500">로그인</span>
-      </header>
-
+    <div className="flex min-h-screen flex-col bg-base-100 text-base-content">
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <LoginForm />
       </main>

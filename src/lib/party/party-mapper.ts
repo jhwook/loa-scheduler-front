@@ -1,3 +1,4 @@
+import { normalizePartyRole } from "@/types/expedition";
 import type {
   PartyCharacterWeeklyRaidHomework,
   PartyGroupDetail,
@@ -72,6 +73,7 @@ function mapMember(member: PartyGroupDetailResponse["members"][number]): PartyGr
       characterLevel: c.characterLevel ?? undefined,
       itemAvgLevel: c.itemAvgLevel ?? "",
       combatPower: c.combatPower ?? null,
+      partyRole: normalizePartyRole(c.partyRole),
       weeklyRaids: mapWeeklyRaidsToHomework(c.weeklyRaids),
     })),
   };
@@ -104,6 +106,7 @@ function mapPublicCharacter(
     characterLevel: c.characterLevel ?? undefined,
     itemAvgLevel: c.itemAvgLevel ?? "",
     combatPower: c.combatPower ?? null,
+    partyRole: normalizePartyRole(c.partyRole),
     weeklyRaids: mapWeeklyRaidsToHomework(c.weeklyRaids),
   };
 }

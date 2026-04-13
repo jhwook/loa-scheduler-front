@@ -14,6 +14,7 @@ import {
   mapDashboardCharacterToMySaved,
   type CharacterDashboardRow,
   type CharactersDashboardResponse,
+  type PartyRole,
 } from '@/types/expedition';
 
 function RefreshAllSpinner({ className }: { className?: string }) {
@@ -160,6 +161,21 @@ export function ExpeditionMyCharacterList() {
     [cooldown, refreshDashboardQuiet]
   );
 
+  const handlePartyRoleUpdated = useCallback(
+    (characterId: number, partyRole: PartyRole) => {
+      setDashboard((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          characters: prev.characters.map((row) =>
+            row.id === characterId ? { ...row, partyRole } : row
+          ),
+        };
+      });
+    },
+    []
+  );
+
   const handleRefreshAll = useCallback(async () => {
     setRefreshingAll(true);
     try {
@@ -296,6 +312,7 @@ export function ExpeditionMyCharacterList() {
                   });
                 }}
                 onDeleteFailed={(msg) => setToast({ kind: 'err', text: msg })}
+                onPartyRoleUpdated={handlePartyRoleUpdated}
               />
             ))}
           </div>

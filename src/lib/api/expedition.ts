@@ -1,11 +1,14 @@
 import { apiFetch } from "@/lib/api/client";
-import type {
-  CharacterDashboardRow,
-  CharactersDashboardResponse,
-  DeleteCharacterResponse,
-  ExpeditionPreviewCharacter,
-  MyCharactersListResponse,
-  MySavedCharacter,
+import {
+  normalizePartyRole,
+  type CharacterDashboardRow,
+  type CharactersDashboardResponse,
+  type DeleteCharacterResponse,
+  type ExpeditionPreviewCharacter,
+  type MyCharactersListResponse,
+  type MySavedCharacter,
+  type PartyRole,
+  type PatchCharacterPartyRoleResponse,
 } from "@/types/expedition";
 
 const EXPEDITION_PREVIEW_PATH = "/users/me/expedition-preview";
@@ -80,10 +83,14 @@ export async function getCharactersDashboard(): Promise<CharactersDashboardRespo
     { method: "GET" },
   );
   const raw = Array.isArray(data?.characters) ? data.characters : [];
-  const characters: CharacterDashboardRow[] = raw.map((row) => ({
-    ...row,
-    weeklyRaids: Array.isArray(row.weeklyRaids) ? row.weeklyRaids : [],
-  }));
+  const characters: CharacterDashboardRow[] = raw.map((row) => {
+    const r = row as CharacterDashboardRow;
+    return {
+      ...r,
+      partyRole: normalizePartyRole(r.partyRole),
+      weeklyRaids: Array.isArray(r.weeklyRaids) ? r.weeklyRaids : [],
+    };
+  });
   return {
     totalCharacterCount: data?.totalCharacterCount ?? 0,
     totalWeeklyGold: data?.totalWeeklyGold ?? 0,
@@ -104,4 +111,24 @@ export async function deleteCharacter(
   return apiFetch<DeleteCharacterResponse>(CHARACTER_PATH(characterId), {
     method: "DELETE",
   });
+}
+
+const CHARACTER_PARTY_ROLE_PATH = (characterId: number) =>
+  `/characters/${characterId}/party-role`;
+
+/**
+ * PATCH {BASE_URL}/characters/:characterId/party-role
+ * Body: { "partyRole": "DEALER" | "SUPPORT" }
+ */
+export async function patchCharacterPartyRole(
+  characterId: number,
+  partyRole: PartyRole,
+): Promise<PatchCharacterPartyRoleResponse> {
+  return apiFetch<PatchCharacterPartyRoleResponse>(
+    CHARACTER_PARTY_ROLE_PATH(characterId),
+    {
+      method: "PATCH",
+      json: { partyRole },
+    },
+  );
 }

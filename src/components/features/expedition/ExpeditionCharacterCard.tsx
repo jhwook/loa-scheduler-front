@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { SupporterRoleMark } from '@/components/ui/supporter-role-mark';
 import { AddRaidModal } from '@/components/raid/add-raid-modal';
 import { EditWeeklyRaidModal } from '@/components/raid/edit-weekly-raid-modal';
-import { deleteCharacter } from '@/lib/api/expedition';
+import { deleteCharacter, patchCharacterPartyRole } from '@/lib/api/expedition';
 import { patchCharacterWeeklyRaidClear } from '@/lib/api/raid';
 import { getClassIconSrc, resolveClassIconBasename } from '@/lib/class-icon';
 import { ApiError } from '@/types/api';
-import type { MySavedCharacter } from '@/types/expedition';
+import type { MySavedCharacter, PartyRole } from '@/types/expedition';
+import { normalizePartyRole } from '@/types/expedition';
 import type { CharacterWeeklyRaidItem } from '@/types/raid';
 
 type Props = {
@@ -28,6 +30,8 @@ type Props = {
   onCharacterDeleted: (result: { message?: string }) => void;
   /** 삭제 실패 시 메시지 표시용 */
   onDeleteFailed: (message: string) => void;
+  /** 역할 변경 성공 시 부모 대시보드 상태만 갱신 (전체 재조회 없음) */
+  onPartyRoleUpdated?: (characterId: number, partyRole: PartyRole) => void;
 };
 
 function InlineSpinner({ className }: { className?: string }) {
@@ -119,6 +123,7 @@ export function ExpeditionCharacterCard({
   refreshLocked,
   onCharacterDeleted,
   onDeleteFailed,
+  onPartyRoleUpdated,
 }: Props) {
   const [imageFailed, setImageFailed] = useState(false);
   const [classIconFailed, setClassIconFailed] = useState(false);
@@ -156,6 +161,38 @@ export function ExpeditionCharacterCard({
     isRefreshing || cooldownRemainingSec > 0 || refreshLocked;
 
   const [deleting, setDeleting] = useState(false);
+
+  const [partyRole, setPartyRole] = useState<PartyRole>(() =>
+    normalizePartyRole(c.partyRole)
+  );
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPartyRole(normalizePartyRole(c.partyRole));
+  }, [c.id, c.partyRole]);
+
+  async function handlePartyRoleChange(next: PartyRole) {
+    if (roleSaving || next === partyRole) return;
+    setRoleError(null);
+    const previous = partyRole;
+    setPartyRole(next);
+    setRoleSaving(true);
+    try {
+      const res = await patchCharacterPartyRole(c.id, next);
+      const resolved = normalizePartyRole(res.character?.partyRole ?? next);
+      setPartyRole(resolved);
+      onPartyRoleUpdated?.(c.id, resolved);
+    } catch (err) {
+      setPartyRole(previous);
+      let msg = '역할 변경에 실패했습니다.';
+      if (err instanceof ApiError) msg = err.message;
+      else if (err instanceof Error) msg = err.message;
+      setRoleError(msg);
+    } finally {
+      setRoleSaving(false);
+    }
+  }
 
   async function handleDelete() {
     if (deleting || refreshLocked) return;
@@ -398,24 +435,91 @@ export function ExpeditionCharacterCard({
       </div>
 
       <div className="border-t border-base-300 bg-base-200 px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-base-content/20 bg-base-300 text-[12px] font-bold text-base-content">
-            {classIconSrc && !classIconFailed ? (
-              // eslint-disable-next-line @next/next/no-img-element -- public 정적 직업 아이콘
-              <img
-                src={classIconSrc}
-                alt=""
-                className="h-full w-full object-cover brightness-0 invert"
-                onError={() => setClassIconFailed(true)}
-              />
-            ) : (
-              classMark
-            )}
+        <div className="flex items-start gap-2.5">
+          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-visible rounded-full border border-base-content/20 bg-base-300 text-[12px] font-bold text-base-content">
+            <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full">
+              {classIconSrc && !classIconFailed ? (
+                // eslint-disable-next-line @next/next/no-img-element -- public 정적 직업 아이콘
+                <img
+                  src={classIconSrc}
+                  alt=""
+                  className="h-full w-full object-cover brightness-0 invert"
+                  onError={() => setClassIconFailed(true)}
+                />
+              ) : (
+                classMark
+              )}
+            </div>
+            {partyRole === 'SUPPORT' ? (
+              <SupporterRoleMark size="md" />
+            ) : null}
           </div>
-          <div className="min-w-0">
-            <h3 className="truncate text-[clamp(14px,1.15vw,17px)] font-bold leading-tight text-base-content">
-              {c.characterName}
-            </h3>
+          <div className="min-w-0 flex-1">
+            <div
+              className="flex min-w-0 items-center justify-between gap-2"
+              aria-busy={roleSaving}
+            >
+              <h3 className="min-w-0 flex-1 truncate text-[clamp(14px,1.15vw,17px)] font-bold leading-tight text-base-content">
+                {c.characterName}
+              </h3>
+              <div className="dropdown dropdown-end shrink-0">
+                <div
+                  tabIndex={roleSaving || deleting ? -1 : 0}
+                  role="button"
+                  className={`badge badge-sm h-7 min-h-7 gap-1 px-2.5 text-[11px] font-bold leading-none ${
+                    partyRole === 'SUPPORT'
+                      ? 'border border-emerald-500/80 bg-emerald-900/75 text-emerald-200'
+                      : 'border border-base-300/70 bg-base-300 text-base-content/90'
+                  } ${roleSaving || deleting ? 'pointer-events-none opacity-60' : 'cursor-pointer hover:opacity-90'}`}
+                  aria-label={
+                    partyRole === 'SUPPORT'
+                      ? '현재 서포터. 역할 변경 메뉴 열기'
+                      : '현재 딜러. 역할 변경 메뉴 열기'
+                  }
+                  aria-haspopup="menu"
+                >
+                  {roleSaving ? (
+                    <InlineSpinner className="h-3 w-3 shrink-0 opacity-80" />
+                  ) : null}
+                  {partyRole === 'SUPPORT' ? '서포터' : '딜러'}
+                </div>
+                <ul
+                  tabIndex={0}
+                  className="menu dropdown-content menu-sm z-50 mt-1 w-32 rounded-box border border-base-300 bg-base-200 p-1 shadow-lg"
+                  role="menu"
+                  aria-label="역할 선택"
+                >
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={roleSaving || deleting}
+                      className={
+                        partyRole === 'DEALER' ? 'active font-semibold' : ''
+                      }
+                      aria-label="딜러로 변경"
+                      onClick={() => void handlePartyRoleChange('DEALER')}
+                    >
+                      딜러
+                    </button>
+                  </li>
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={roleSaving || deleting}
+                      className={
+                        partyRole === 'SUPPORT' ? 'active font-semibold' : ''
+                      }
+                      aria-label="서포터로 변경"
+                      onClick={() => void handlePartyRoleChange('SUPPORT')}
+                    >
+                      서포터
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </div>
             <p className="mt-0.5 truncate text-[clamp(11px,0.9vw,13px)] text-base-content/80">
               <span>{c.serverName}</span>
               <span className="mx-1.5 text-base-content/60">/</span>
@@ -425,6 +529,14 @@ export function ExpeditionCharacterCard({
                 {c.combatPower}
               </span>
             </p>
+            {roleError ? (
+              <p
+                className="mt-1 text-right text-[clamp(10px,0.8vw,11px)] text-rose-400"
+                role="alert"
+              >
+                {roleError}
+              </p>
+            ) : null}
             <p className="mt-1 text-[clamp(9px,0.75vw,10px)] text-base-content/60">
               최근 업데이트: <RelativeLastSynced at={c.lastSyncedAt} />
             </p>

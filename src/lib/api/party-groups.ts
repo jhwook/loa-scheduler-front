@@ -1,10 +1,12 @@
 import { apiFetch } from "@/lib/api/client";
+import type { PartyPoolOrderedRow } from "@/lib/party-pool-order";
 import type {
   PartyGroupCreateInput,
   PartyGroupDetail,
   PartyGroupMyCharacterItem,
 } from "@/types/party";
 import type { PartyGroupCharactersResponse } from "@/types/party-api";
+import { normalizePartyRole } from "@/types/expedition";
 
 const PARTY_GROUPS_PATH = "/party-groups";
 const PARTY_GROUPS_MY_PATH = "/party-groups/my";
@@ -101,6 +103,9 @@ export async function getPartyGroupDetail(groupId: number): Promise<unknown> {
 const PARTY_GROUP_CHARACTERS_PATH = (groupId: number) =>
   `${PARTY_GROUPS_DETAIL_PATH(groupId)}/characters`;
 
+const PARTY_GROUP_PARTY_BUILDER_CHARACTERS_PATH = (groupId: number) =>
+  `${PARTY_GROUPS_DETAIL_PATH(groupId)}/party-builder-characters`;
+
 /**
  * GET {BASE_URL}/party-groups/:groupId/characters
  * 공격대에 공개된 캐릭터 기준 멤버·로스터
@@ -111,6 +116,95 @@ export async function getPartyGroupCharacters(
   return apiFetch<PartyGroupCharactersResponse>(PARTY_GROUP_CHARACTERS_PATH(groupId), {
     method: "GET",
   });
+}
+
+function extractPartyBuilderCharactersArray(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const keys = [
+      "characters",
+      "partyBuilderCharacters",
+      "data",
+      "items",
+      "rows",
+    ] as const;
+    for (const k of keys) {
+      const list = o[k];
+      if (Array.isArray(list)) return list;
+    }
+  }
+  return [];
+}
+
+function formatItemAvgLevelPartyBuilder(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Number.isInteger(value) ? String(value) : String(value);
+  }
+  if (typeof value === "string") {
+    const t = value.replace(/,/g, "").trim();
+    if (t) return t;
+  }
+  return "0";
+}
+
+function formatCombatPowerPartyBuilder(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "string") {
+    const t = value.trim();
+    return t || null;
+  }
+  return null;
+}
+
+function normalizePartyBuilderPoolRow(raw: unknown): PartyPoolOrderedRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  /** 공개 캐릭터 API와 동일하게 `characterId`로 올 수 있음 */
+  const id = toNumber(r.id) ?? toNumber(r.characterId);
+  if (id === null || id <= 0) return null;
+  const characterName =
+    typeof r.characterName === "string" ? r.characterName.trim() : "";
+  const ownerRaw =
+    typeof r.ownerDisplayName === "string" ? r.ownerDisplayName.trim() : "";
+  const ownerDisplayName = ownerRaw || "—";
+  const serverName =
+    typeof r.serverName === "string" && r.serverName.trim()
+      ? r.serverName.trim()
+      : "";
+  const characterClassName =
+    typeof r.characterClassName === "string" && r.characterClassName.trim()
+      ? r.characterClassName.trim()
+      : null;
+  const character: PartyPoolOrderedRow["character"] = {
+    id,
+    characterName: characterName || `캐릭터 #${id}`,
+    serverName,
+    itemAvgLevel: formatItemAvgLevelPartyBuilder(r.itemAvgLevel),
+    characterClassName,
+    combatPower: formatCombatPowerPartyBuilder(r.combatPower),
+    partyRole: normalizePartyRole(r.partyRole),
+  };
+  return { ownerDisplayName, character };
+}
+
+/**
+ * GET {BASE_URL}/party-groups/:groupId/party-builder-characters
+ * 파티 편성용 공개 캐릭터 전체 목록 (장비 레벨 내림차순, 서버 정렬 순서 유지)
+ */
+export async function getPartyBuilderCharacters(
+  groupId: number,
+): Promise<PartyPoolOrderedRow[]> {
+  const raw = await apiFetch<unknown>(
+    PARTY_GROUP_PARTY_BUILDER_CHARACTERS_PATH(groupId),
+    { method: "GET" },
+  );
+  return extractPartyBuilderCharactersArray(raw)
+    .map(normalizePartyBuilderPoolRow)
+    .filter((x): x is PartyPoolOrderedRow => x !== null);
 }
 
 type PartyGroupActionResponse = {

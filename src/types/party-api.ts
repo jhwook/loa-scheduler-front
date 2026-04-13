@@ -35,6 +35,7 @@ export type PartyCharacterResponse = {
   combatPower: string | null;
   lastSyncedAt: string | null;
   weeklyRaids: PartyWeeklyRaidResponse[] | null;
+  partyRole?: string | null;
 };
 
 export type PartyWeeklyRaidResponse = {
@@ -70,6 +71,7 @@ export type PartyGroupPublicCharacterResponse = {
   combatPower: string | null;
   lastSyncedAt: string | null;
   weeklyRaids: PartyWeeklyRaidResponse[] | null;
+  partyRole?: string | null;
 };
 
 export type PartyGroupCharactersMemberResponse = {
