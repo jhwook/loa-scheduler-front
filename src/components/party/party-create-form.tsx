@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useState } from 'react';
 
-import type { PartyGroupCreateInput } from "@/types/party";
+import type { PartyGroupCreateInput } from '@/types/party';
 
 type Props = {
   onSubmit: (data: PartyGroupCreateInput) => void | Promise<void>;
@@ -19,8 +19,8 @@ export function PartyCreateForm({
   onCancel,
   isSubmitting = false,
 }: Props) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -28,7 +28,7 @@ export function PartyCreateForm({
     if (!trimmed) return;
     await onSubmit({
       name: trimmed,
-      description: description.trim() || "",
+      description: description.trim() || '',
     });
   }
 
@@ -48,7 +48,6 @@ export function PartyCreateForm({
           onChange={(e) => setName(e.target.value)}
           required
           maxLength={80}
-          placeholder="예: 주말 격추 공대"
           className="input input-bordered w-full border-base-300 bg-base-200 text-sm text-base-content placeholder:text-base-content/60"
         />
       </div>
@@ -65,7 +64,6 @@ export function PartyCreateForm({
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
           maxLength={500}
-          placeholder="모집 조건, 일정 등을 적어 두세요."
           className="textarea textarea-bordered w-full resize-none border-base-300 bg-base-200 text-sm text-base-content placeholder:text-base-content/60"
         />
       </div>
@@ -83,7 +81,7 @@ export function PartyCreateForm({
           className="btn btn-primary btn-sm text-primary-content"
           disabled={isSubmitting || !name.trim()}
         >
-          {isSubmitting ? "생성 중…" : "생성"}
+          {isSubmitting ? '생성 중…' : '생성'}
         </button>
       </div>
     </form>

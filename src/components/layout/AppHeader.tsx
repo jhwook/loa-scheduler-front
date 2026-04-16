@@ -113,10 +113,17 @@ export function AppHeader() {
       <header className="sticky top-0 z-40 border-b border-base-300 bg-base-200/95 backdrop-blur">
         <div className="flex h-14 items-center justify-between px-4 md:px-8">
           <Link
-            href="/"
-            className="text-sm font-semibold tracking-tight text-base-content"
+            href="/dashboard"
+            className="flex min-w-0 max-w-[min(100%,14rem)] items-center gap-2 sm:max-w-none"
           >
-            LoA Scheduler
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-content">
+              LoA
+            </div>
+            <div className="hidden min-w-0 flex-col sm:flex">
+              <span className="truncate text-sm font-semibold tracking-tight text-base-content">
+                LoA Scheduler
+              </span>
+            </div>
           </Link>
           <span className="text-xs text-base-content/60">
             {pathname === '/login' ? '로그인' : '회원가입'}

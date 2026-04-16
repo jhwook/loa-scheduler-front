@@ -299,7 +299,7 @@ export function ExpeditionPreviewModal({ open, onClose }: Props) {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="input input-bordered w-full border-base-300 bg-base-300 text-sm font-medium text-base-content placeholder:text-base-content/60"
-                  placeholder="예: 뿔코a"
+                  placeholder="예: 그만넘어져"
                   disabled={loading}
                 />
               </label>

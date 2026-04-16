@@ -24,7 +24,6 @@ import {
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  arrayMove,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
@@ -40,11 +39,7 @@ import {
 import { CreateRaidPartyButton } from '@/components/raid-party/create-raid-party-button';
 import { CreateRaidPartyModal } from '@/components/raid-party/create-raid-party-modal';
 import { RaidPartyDetailView } from '@/components/raid-party/raid-party-detail-view';
-import {
-  cancelPartyGroupInvite,
-  createPartyGroupInvite,
-  getSentPartyGroupInvites,
-} from '@/lib/api/party-group-invites';
+import { createPartyGroupInvite } from '@/lib/api/party-group-invites';
 import {
   getPartyBuilderCharacters,
   getPartyGroupCharacters,
@@ -89,7 +84,6 @@ import type {
   PartyGroupDetail,
   PartyGroupMyCharacterItem,
 } from '@/types/party';
-import type { PartySentInviteItem } from '@/types/party-invite';
 import type { LevelRangeFilter } from '@/types/level-range-filter';
 import {
   globalSlotIndexToPartyAndSlot,
@@ -103,7 +97,6 @@ type Props = {
 };
 
 type GroupDetailTab = 'status' | 'party' | 'settings';
-type InviteModalTab = 'create' | 'sent';
 type GroupConfirmAction = 'leave' | 'delete';
 
 function partyTabCollisionDetection(args: Parameters<typeof closestCenter>[0]) {
@@ -175,34 +168,14 @@ function PublicCharServerSelectAllCheckbox({
   );
 }
 
-function inviteStatusBadgeClass(status: string): string {
-  switch (status) {
-    case 'ACCEPTED':
-      return 'badge badge-success badge-sm text-white';
-    case 'REJECTED':
-      return 'badge badge-error badge-sm text-white';
-    case 'CANCELED':
-      return 'badge badge-neutral badge-sm text-white';
-    case 'PENDING':
-    default:
-      return 'badge badge-warning badge-sm text-primary-content';
-  }
-}
-
 export function PartyGroupPageClient({ groupId }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<GroupDetailTab>('status');
-  const [inviteModalTab, setInviteModalTab] =
-    useState<InviteModalTab>('create');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteNickname, setInviteNickname] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [sentInvites, setSentInvites] = useState<PartySentInviteItem[]>([]);
-  const [sentLoading, setSentLoading] = useState(false);
-  const [sentError, setSentError] = useState<string | null>(null);
-  const [cancelBusyId, setCancelBusyId] = useState<number | null>(null);
   const [toast, setToast] = useState<{
     kind: 'ok' | 'err';
     text: string;
@@ -256,13 +229,14 @@ export function PartyGroupPageClient({ groupId }: Props) {
   const [partyPoolRows, setPartyPoolRows] = useState<PartyPoolOrderedRow[]>([]);
   const [partyPoolLoading, setPartyPoolLoading] = useState(false);
   const [partyPoolError, setPartyPoolError] = useState<string | null>(null);
-  const [levelRangeFilters, setLevelRangeFilters] = useState<LevelRangeFilter[]>(
-    []
-  );
+  const [levelRangeFilters, setLevelRangeFilters] = useState<
+    LevelRangeFilter[]
+  >([]);
   const [levelRangeFiltersError, setLevelRangeFiltersError] = useState<
     string | null
   >(null);
-  const [selectedPosition, setSelectedPosition] = useState<PositionFilter>('ALL');
+  const [selectedPosition, setSelectedPosition] =
+    useState<PositionFilter>('ALL');
   const [levelMinBound, setLevelMinBound] = useState(1640);
   const [levelMaxBound, setLevelMaxBound] = useState(1800);
   const [selectedMinLevel, setSelectedMinLevel] = useState(1640);
@@ -290,30 +264,33 @@ export function PartyGroupPageClient({ groupId }: Props) {
     [publicCharGrouped]
   );
 
-  const loadGroupDetail = useCallback(async (showBusy = true) => {
-    if (!Number.isFinite(groupId) || groupId <= 0) {
-      setError('유효하지 않은 공격대 ID 입니다.');
-      setGroup(null);
-      return;
-    }
-    if (showBusy) setBusy(true);
-    setError(null);
-    try {
-      const raw = await getPartyGroupCharacters(groupId);
-      const mapped = mapPartyGroupCharactersResponseToViewModel(raw);
-      setGroup(mapped);
-      setNicknameDrafts(
-        Object.fromEntries(mapped.members.map((m) => [m.id, '']))
-      );
-    } catch (e) {
-      const message =
-        e instanceof Error ? e.message : '공격대 정보를 불러오지 못했습니다.';
-      setError(message);
-      setGroup(null);
-    } finally {
-      if (showBusy) setBusy(false);
-    }
-  }, [groupId]);
+  const loadGroupDetail = useCallback(
+    async (showBusy = true) => {
+      if (!Number.isFinite(groupId) || groupId <= 0) {
+        setError('유효하지 않은 공격대 ID 입니다.');
+        setGroup(null);
+        return;
+      }
+      if (showBusy) setBusy(true);
+      setError(null);
+      try {
+        const raw = await getPartyGroupCharacters(groupId);
+        const mapped = mapPartyGroupCharactersResponseToViewModel(raw);
+        setGroup(mapped);
+        setNicknameDrafts(
+          Object.fromEntries(mapped.members.map((m) => [m.id, '']))
+        );
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : '공격대 정보를 불러오지 못했습니다.';
+        setError(message);
+        setGroup(null);
+      } finally {
+        if (showBusy) setBusy(false);
+      }
+    },
+    [groupId]
+  );
 
   const loadRaidPartyList = useCallback(async () => {
     if (!group) return;
@@ -568,7 +545,9 @@ export function PartyGroupPageClient({ groupId }: Props) {
       setSelectedMaxLevel(1800);
       return;
     }
-    const levels = partyPoolRows.map((r) => parseItemLevel(r.character.itemAvgLevel));
+    const levels = partyPoolRows.map((r) =>
+      parseItemLevel(r.character.itemAvgLevel)
+    );
     const min = Math.floor(Math.min(...levels));
     const max = Math.ceil(Math.max(...levels));
     const safeMin = Number.isFinite(min) ? Math.min(min, 1640) : 1640;
@@ -586,7 +565,10 @@ export function PartyGroupPageClient({ groupId }: Props) {
   }, [partyPoolRows]);
 
   const orderedPartyPoolRows = useMemo(
-    () => partyPoolOrderIds.map((id) => rowById.get(id)).filter(Boolean) as PartyPoolOrderedRow[],
+    () =>
+      partyPoolOrderIds
+        .map((id) => rowById.get(id))
+        .filter(Boolean) as PartyPoolOrderedRow[],
     [partyPoolOrderIds, rowById]
   );
 
@@ -601,7 +583,12 @@ export function PartyGroupPageClient({ groupId }: Props) {
       const level = parseItemLevel(row.character.itemAvgLevel);
       return inLevelRange(level, selectedMinLevel, selectedMaxLevel);
     });
-  }, [orderedPartyPoolRows, selectedPosition, selectedMinLevel, selectedMaxLevel]);
+  }, [
+    orderedPartyPoolRows,
+    selectedPosition,
+    selectedMinLevel,
+    selectedMaxLevel,
+  ]);
 
   const poolRenderableSections = useMemo<PartyPoolRenderableSection[]>(() => {
     const sectionData = buildLevelRangeSections({
@@ -709,20 +696,11 @@ export function PartyGroupPageClient({ groupId }: Props) {
         return;
       }
 
-      const overPool = parsePoolCharDndId(over.id);
-      if (fromPool != null && overPool != null) {
-        const oldIndex = partyPoolOrderIds.indexOf(fromPool);
-        const newIndex = partyPoolOrderIds.indexOf(overPool);
-        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
-        setPartyPoolOrderIds(
-          arrayMove([...partyPoolOrderIds], oldIndex, newIndex)
-        );
-      }
+      // 공대 캐릭터 목록 내 카드 간 순서 변경은 허용하지 않음.
     },
     [
       assignCharacterToRaidPartySlot,
       moveRaidPartyMemberToSlot,
-      partyPoolOrderIds,
     ]
   );
 
@@ -823,26 +801,6 @@ export function PartyGroupPageClient({ groupId }: Props) {
     );
   }, [activeTab, raidPartyList]);
 
-  async function loadSentInvites() {
-    setSentLoading(true);
-    setSentError(null);
-    try {
-      const rows = await getSentPartyGroupInvites();
-      setSentInvites(rows);
-    } catch (err) {
-      const msg =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : '보낸 초대 현황을 불러오지 못했습니다.';
-      setSentError(msg);
-      setSentInvites([]);
-    } finally {
-      setSentLoading(false);
-    }
-  }
-
   async function onInviteSubmit() {
     if (!group) return;
     const nickname = inviteNickname.trim();
@@ -861,9 +819,6 @@ export function PartyGroupPageClient({ groupId }: Props) {
       setInviteNickname('');
       setInviteMessage('');
       setToast({ kind: 'ok', text: '초대 전송 완료' });
-      if (inviteModalTab === 'sent') {
-        await loadSentInvites();
-      }
     } catch (err) {
       const msg =
         err instanceof ApiError
@@ -875,25 +830,6 @@ export function PartyGroupPageClient({ groupId }: Props) {
       setToast({ kind: 'err', text: msg });
     } finally {
       setInviteBusy(false);
-    }
-  }
-
-  async function onCancelInvite(inviteId: number) {
-    setCancelBusyId(inviteId);
-    try {
-      await cancelPartyGroupInvite(inviteId);
-      await loadSentInvites();
-      setToast({ kind: 'ok', text: '초대를 취소했습니다.' });
-    } catch (err) {
-      const msg =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : '초대 취소에 실패했습니다.';
-      setToast({ kind: 'err', text: msg });
-    } finally {
-      setCancelBusyId(null);
     }
   }
 
@@ -1136,7 +1072,6 @@ export function PartyGroupPageClient({ groupId }: Props) {
             type="button"
             className="btn btn-sm btn-outline border-base-300 text-base-content"
             onClick={() => {
-              setInviteModalTab('create');
               setInviteOpen(true);
             }}
           >
@@ -1178,15 +1113,6 @@ export function PartyGroupPageClient({ groupId }: Props) {
           <div className="mb-5 flex flex-col gap-3 border-b border-base-300 pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-base-content">파티</h2>
-              <p className="mt-1 text-sm text-base-content/60">
-                공대 캐릭터는 드래그해 순서를 바꾸거나 파티 슬롯에 놓아 배치할
-                수 있습니다. 슬롯 안 카드는 다른 슬롯으로 옮기거나(덮어쓰면 위치
-                교환), 휴지통으로 파티에서 뺄 수 있습니다. 상단 초록 헤더 영역을
-                눌러 파티를 선택한 뒤{' '}
-                <strong className="text-base-content/75">파티 삭제</strong>로
-                해당 레이드 파티 전체를 지울 수 있습니다. 공개 캐릭터만 목록에
-                나타납니다.
-              </p>
             </div>
             <CreateRaidPartyButton
               onClick={() => setCreateRaidPartyModalOpen(true)}
@@ -1236,7 +1162,10 @@ export function PartyGroupPageClient({ groupId }: Props) {
                   <div className="mt-2 rounded-xl border border-base-300 bg-base-200/30 p-3">
                     <div className="grid grid-cols-2 gap-2">
                       {Array.from({ length: 6 }).map((_, idx) => (
-                        <div key={idx} className="skeleton h-[76px] w-full rounded-lg" />
+                        <div
+                          key={idx}
+                          className="skeleton h-[76px] w-full rounded-lg"
+                        />
                       ))}
                     </div>
                   </div>
@@ -1291,10 +1220,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
                       const detail = raidPartyDetails[p.id];
                       const rowErr = raidPartyDetailErrors[p.id];
                       return (
-                        <div
-                          key={p.id}
-                          className="w-[28rem] shrink-0"
-                        >
+                        <div key={p.id} className="w-[28rem] shrink-0">
                           {raidPartyDetailsLoading && !detail && !rowErr ? (
                             <div className="rounded-xl border border-base-300 bg-base-200/30 p-3">
                               <div className="space-y-2">
@@ -1386,9 +1312,6 @@ export function PartyGroupPageClient({ groupId }: Props) {
           <h2 className="text-lg font-semibold text-base-content">
             공격대 설정
           </h2>
-          <p className="mt-1 text-sm text-base-content/60">
-            공개 캐릭터, 그룹 내 별명, 공격대 탈퇴/삭제를 설정할 수 있습니다.
-          </p>
           <div className="mt-5 rounded-xl border border-base-300 bg-base-200/40 p-4">
             <h3 className="text-sm font-semibold text-base-content">
               공격대 캐릭터 설정
@@ -1437,12 +1360,15 @@ export function PartyGroupPageClient({ groupId }: Props) {
                     disabled={nicknameBusyMemberId !== null}
                     onClick={() => void onSaveNickname(myMemberInGroup.id)}
                   >
-                    {nicknameBusyMemberId === myMemberInGroup.id ? '저장 중…' : '저장'}
+                    {nicknameBusyMemberId === myMemberInGroup.id
+                      ? '저장 중…'
+                      : '저장'}
                   </button>
                 </div>
               ) : (
                 <p className="rounded-lg border border-base-300 bg-base-300/40 px-3 py-2 text-xs text-base-content/70">
-                  내 멤버 정보를 확인할 수 없습니다. 새로고침 후 다시 시도해 주세요.
+                  내 멤버 정보를 확인할 수 없습니다. 새로고침 후 다시 시도해
+                  주세요.
                 </p>
               )}
             </div>
@@ -1858,151 +1784,60 @@ export function PartyGroupPageClient({ groupId }: Props) {
               멤버 초대
             </h3>
 
-            <div
-              role="tablist"
-              className="tabs tabs-box mt-4 w-fit bg-base-300/80"
-            >
-              <button
-                type="button"
-                role="tab"
-                className={`tab text-white ${inviteModalTab === 'create' ? 'tab-active text-white!' : ''}`}
-                onClick={() => setInviteModalTab('create')}
-              >
-                초대하기
-              </button>
-              <button
-                type="button"
-                role="tab"
-                className={`tab text-white ${inviteModalTab === 'sent' ? 'tab-active text-white!' : ''}`}
-                onClick={() => {
-                  setInviteModalTab('sent');
-                  void loadSentInvites();
-                }}
-              >
-                초대현황
-              </button>
-            </div>
+            <div className="mt-4">
+              <p className="text-xs text-base-content/60">
+                닉네임으로 공격대 초대를 보냅니다.
+              </p>
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs text-base-content/60">
+                    닉네임
+                  </label>
+                  <input
+                    type="text"
+                    value={inviteNickname}
+                    onChange={(e) => setInviteNickname(e.target.value)}
+                    className="input input-bordered w-full border-base-300 bg-base-300 text-sm text-base-content"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-base-content/60">
+                    메시지
+                  </label>
+                  <textarea
+                    value={inviteMessage}
+                    onChange={(e) => setInviteMessage(e.target.value)}
+                    className="textarea textarea-bordered w-full border-base-300 bg-base-300 text-sm text-base-content"
+                    rows={3}
+                  />
+                </div>
+              </div>
 
-            {inviteModalTab === 'create' ? (
-              <div className="mt-4">
-                <p className="text-xs text-base-content/60">
-                  닉네임으로 공격대 초대를 보냅니다.
+              {inviteError ? (
+                <p className="mt-3 rounded-lg bg-rose-950/30 px-3 py-2 text-xs text-error/80">
+                  {inviteError}
                 </p>
-                <div className="mt-3 space-y-3">
-                  <div>
-                    <label className="mb-1 block text-xs text-base-content/60">
-                      닉네임
-                    </label>
-                    <input
-                      type="text"
-                      value={inviteNickname}
-                      onChange={(e) => setInviteNickname(e.target.value)}
-                      className="input input-bordered w-full border-base-300 bg-base-300 text-sm text-base-content"
-                      placeholder="예: 브붕이"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-base-content/60">
-                      메시지
-                    </label>
-                    <textarea
-                      value={inviteMessage}
-                      onChange={(e) => setInviteMessage(e.target.value)}
-                      className="textarea textarea-bordered w-full border-base-300 bg-base-300 text-sm text-base-content"
-                      rows={3}
-                      placeholder="예: 같이 종막 가요!"
-                    />
-                  </div>
-                </div>
+              ) : null}
 
-                {inviteError ? (
-                  <p className="mt-3 rounded-lg bg-rose-950/30 px-3 py-2 text-xs text-error/80">
-                    {inviteError}
-                  </p>
-                ) : null}
-
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm text-base-content/80"
-                    onClick={() => setInviteOpen(false)}
-                    disabled={inviteBusy}
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm text-primary-content"
-                    onClick={() => void onInviteSubmit()}
-                    disabled={inviteBusy}
-                  >
-                    {inviteBusy ? '전송 중…' : '초대 전송'}
-                  </button>
-                </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-base-content/80"
+                  onClick={() => setInviteOpen(false)}
+                  disabled={inviteBusy}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm text-primary-content"
+                  onClick={() => void onInviteSubmit()}
+                  disabled={inviteBusy}
+                >
+                  {inviteBusy ? '전송 중…' : '초대 전송'}
+                </button>
               </div>
-            ) : (
-              <div className="mt-4 max-h-[min(50vh,320px)] overflow-y-auto rounded-xl border border-base-300 bg-base-300/50 p-3 [scrollbar-color:rgb(71_85_105)_rgb(15_23_42)] [scrollbar-width:thin]">
-                {sentLoading ? (
-                  <p className="py-6 text-center text-sm text-base-content/60">
-                    불러오는 중…
-                  </p>
-                ) : sentError ? (
-                  <p className="rounded-lg bg-rose-950/30 px-3 py-2 text-xs text-error/80">
-                    {sentError}
-                  </p>
-                ) : sentInvites.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-base-content/60">
-                    보낸 초대가 없습니다.
-                  </p>
-                ) : (
-                  <div className="space-y-3 pr-1">
-                    {sentInvites.map((inv) => (
-                      <div
-                        key={inv.id}
-                        className="rounded-xl border border-base-300 bg-base-200/60 px-4 py-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-base-content">
-                              {inv.groupName}
-                            </p>
-                            <p className="mt-1 text-xs text-base-content/60">
-                              초대받은 사람: {inv.invitedUserName}
-                            </p>
-                          </div>
-                          <span className={inviteStatusBadgeClass(inv.status)}>
-                            {inv.status}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-base-content/80">
-                          {inv.message?.trim() ? inv.message : '메시지 없음'}
-                        </p>
-                        <p className="mt-1 text-xs text-base-content/60">
-                          생성일:{' '}
-                          {inv.createdAt
-                            ? new Date(inv.createdAt).toLocaleString()
-                            : '-'}
-                        </p>
-                        {inv.status === 'PENDING' ? (
-                          <div className="mt-3 flex justify-end">
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline border-rose-500/50 text-rose-300 hover:bg-rose-900/30"
-                              onClick={() => void onCancelInvite(inv.id)}
-                              disabled={cancelBusyId === inv.id}
-                            >
-                              {cancelBusyId === inv.id
-                                ? '취소 중…'
-                                : '초대 취소'}
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </div>
         </div>
       ) : null}
