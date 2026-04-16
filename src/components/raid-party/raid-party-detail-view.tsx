@@ -85,7 +85,7 @@ export function RaidPartyDetailView({
 
   return (
     <div
-      className={`flex min-h-0 w-full min-w-0 flex-col rounded-xl border bg-base-200/40 p-3 shadow-sm sm:p-4 ${
+      className={`flex min-h-0 w-full min-w-0 flex-col rounded-xl border bg-base-200/40 p-3 shadow-sm ${
         onSelectParty && isPartySelected
           ? "border-primary/50 ring-2 ring-primary/35"
           : "border-base-300"

@@ -56,7 +56,7 @@ export async function apiFetch<T>(
   const res = await fetch(url, {
     ...rest,
     headers: initHeaders,
-    body: bodyPayload !== undefined ? bodyPayload : rest.body,
+    body: bodyPayload,
   });
 
   const contentType = res.headers.get("content-type") ?? "";

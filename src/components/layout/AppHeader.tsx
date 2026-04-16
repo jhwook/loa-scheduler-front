@@ -2,38 +2,39 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 
 import { UserMenu } from '@/components/features/auth/UserMenu';
 import { LostarkApiKeyRegisterButton } from '@/components/features/expedition/LostarkApiKeyRegisterButton';
+import { getMe } from '@/lib/api/users';
 
 function navActive(pathname: string, href: string) {
-  if (href === '/dashboard') {
-    return pathname === '/' || pathname.startsWith('/dashboard');
-  }
   if (href === '/admin') {
     return pathname === '/admin' || pathname.startsWith('/admin/');
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-type NavItem =
-  | { href: string; label: string; chart: true }
-  | { href: string; label: string; emoji: string; bold?: boolean };
+function isAdminRole(role: string | undefined): boolean {
+  if (!role) return false;
+  return role.trim().toUpperCase().includes('ADMIN');
+}
 
-const links: NavItem[] = [
-  { href: '/dashboard', label: '대시보드', chart: true },
-  { href: '/raidschedule', label: '레이드 일정', emoji: '📅' },
-  { href: '/expedition', label: '원정대', emoji: '👥' },
-  { href: '/party', label: '공격대', emoji: '⚔️', bold: true },
-  { href: '/admin', label: '관리자', emoji: '🛠️' },
+type NavItem = { href: string; label: string; bold?: boolean };
+
+const baseLinks: NavItem[] = [
+  { href: '/expedition', label: '원정대' },
+  { href: '/party', label: '공격대', bold: true },
 ];
 
 function NavLinks({
   pathname,
+  links,
   onNavigate,
   className,
 }: {
   pathname: string;
+  links: NavItem[];
   onNavigate?: () => void;
   className?: string;
 }) {
@@ -41,7 +42,6 @@ function NavLinks({
     <ul className={className} role="list">
       {links.map((item) => {
         const active = navActive(pathname, item.href);
-        const isChart = 'chart' in item && item.chart;
         return (
           <li key={item.href}>
             <Link
@@ -49,23 +49,10 @@ function NavLinks({
               onClick={onNavigate}
               className={
                 active
-                  ? 'active bg-base-300 font-medium text-base-content'
-                  : 'text-base-content/85'
+                  ? 'active bg-base-300 px-4 py-2 font-semibold text-base-content'
+                  : 'px-4 py-2 text-base-content/85'
               }
             >
-              {isChart ? (
-                <div className="h-8 w-8 shrink-0 p-[2px]">
-                  <div className="flex h-full w-full items-end justify-between rounded-lg bg-transparent px-[2px] pb-[2px]">
-                    <span className="h-2.5 w-1 rounded-sm bg-sky-400" />
-                    <span className="h-3.5 w-1 rounded-sm bg-emerald-400" />
-                    <span className="h-[18px] w-1 rounded-sm bg-fuchsia-400" />
-                  </div>
-                </div>
-              ) : (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center text-base">
-                  {'emoji' in item ? item.emoji : null}
-                </span>
-              )}
               <span
                 className={
                   'bold' in item && item.bold ? 'font-semibold' : undefined
@@ -85,6 +72,41 @@ export function AppHeader() {
   const pathname = usePathname();
   const showApiKey = pathname.startsWith('/expedition');
   const authPage = pathname === '/login' || pathname === '/signup';
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadAdminAccess() {
+      try {
+        const me = await getMe();
+        if (!alive) return;
+        const allowed =
+          me.isAdmin === true ||
+          me.user?.isAdmin === true ||
+          isAdminRole(me.role) ||
+          isAdminRole(me.user?.role) ||
+          (Array.isArray(me.roles) && me.roles.some((r) => isAdminRole(r))) ||
+          (Array.isArray(me.user?.roles) &&
+            me.user.roles.some((r) => isAdminRole(r)));
+        setShowAdminMenu(allowed);
+      } catch {
+        if (!alive) return;
+        setShowAdminMenu(false);
+      }
+    }
+    void loadAdminAccess();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const links = useMemo<NavItem[]>(
+    () =>
+      showAdminMenu
+        ? [...baseLinks, { href: '/admin', label: '관리자' }]
+        : baseLinks,
+    [showAdminMenu],
+  );
 
   if (authPage) {
     return (
@@ -133,7 +155,8 @@ export function AppHeader() {
             </button>
             <NavLinks
               pathname={pathname}
-              className="menu dropdown-content menu-sm z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-200 p-2 shadow-lg"
+              links={links}
+              className="menu dropdown-content z-50 mt-2 w-64 rounded-box border border-base-300 bg-base-200 p-2 text-base shadow-lg"
             />
           </div>
 
@@ -150,13 +173,12 @@ export function AppHeader() {
               </span>
             </div>
           </Link>
-        </div>
 
-        <div className="navbar-center hidden max-w-3xl flex-[2] justify-center px-2 lg:flex">
-          <nav aria-label="주 메뉴">
+          <nav aria-label="주 메뉴" className="ml-2 hidden lg:block">
             <NavLinks
               pathname={pathname}
-              className="menu menu-horizontal menu-sm gap-0.5 rounded-xl bg-transparent px-0"
+              links={links}
+              className="menu menu-horizontal gap-1 rounded-xl bg-transparent px-1 text-base"
             />
           </nav>
         </div>

@@ -58,6 +58,7 @@ export function EditRaidGateModal({
   if (!open || !gate || !state) return null;
 
   async function handleSave() {
+    if (!state || !gate) return;
     const payload: UpdateRaidGateRequest = {
       difficulty: state.difficulty.trim(),
       gateNumber: Number(state.gateNumber),

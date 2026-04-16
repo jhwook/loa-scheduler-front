@@ -49,6 +49,7 @@ export function EditRaidModal({
   if (!open || !raid || !state) return null;
 
   async function handleSave() {
+    if (!state || !raid) return;
     await onSubmit(raid.id, {
       raidName: state.raidName.trim(),
       partySize: state.partySize,

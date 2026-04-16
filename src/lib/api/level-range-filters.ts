@@ -6,6 +6,7 @@ import type {
 } from "@/types/level-range-filter";
 
 const ADMIN_LEVEL_RANGE_FILTERS_PATH = "/level-range-filters/admin";
+const LEVEL_RANGE_FILTERS_PATH = "/level-range-filters";
 const ADMIN_LEVEL_RANGE_FILTER_PATH = (id: number) =>
   `${ADMIN_LEVEL_RANGE_FILTERS_PATH}/${id}`;
 
@@ -54,6 +55,13 @@ export function mapLevelRangeFilterFromApi(row: unknown): LevelRangeFilter {
 
 export async function getAdminLevelRangeFilters(): Promise<LevelRangeFilter[]> {
   const raw = await apiFetch<unknown>(ADMIN_LEVEL_RANGE_FILTERS_PATH, {
+    method: "GET",
+  });
+  return extractFilterListRaw(raw).map(mapLevelRangeFilterFromApi);
+}
+
+export async function getLevelRangeFilters(): Promise<LevelRangeFilter[]> {
+  const raw = await apiFetch<unknown>(LEVEL_RANGE_FILTERS_PATH, {
     method: "GET",
   });
   return extractFilterListRaw(raw).map(mapLevelRangeFilterFromApi);

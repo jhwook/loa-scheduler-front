@@ -30,9 +30,13 @@ import {
 } from '@dnd-kit/sortable';
 
 import { CharacterClassMark } from '@/components/features/expedition/character-class-mark';
+import { PartyCharacterFilters } from '@/components/party-builder/party-character-filters';
 import { PartyMemberCard } from '@/components/party/party-member-card';
 import { PartyPoolCharacterCard } from '@/components/party/party-pool-character-card';
-import { PartyPoolSortableGrid } from '@/components/party/party-pool-sortable-grid';
+import {
+  PartyPoolSortableGrid,
+  type PartyPoolRenderableSection,
+} from '@/components/party/party-pool-sortable-grid';
 import { CreateRaidPartyButton } from '@/components/raid-party/create-raid-party-button';
 import { CreateRaidPartyModal } from '@/components/raid-party/create-raid-party-modal';
 import { RaidPartyDetailView } from '@/components/raid-party/raid-party-detail-view';
@@ -50,6 +54,13 @@ import {
   getPartyGroupMyCharacters,
   putPartyGroupMyCharacters,
 } from '@/lib/api/party-groups';
+import { getLevelRangeFilters } from '@/lib/api/level-range-filters';
+import {
+  buildLevelRangeSections,
+  inLevelRange,
+  parseItemLevel,
+  type PositionFilter,
+} from '@/lib/party-builder/level-range';
 import {
   assignRaidPartySlot,
   deleteRaidParty,
@@ -79,6 +90,7 @@ import type {
   PartyGroupMyCharacterItem,
 } from '@/types/party';
 import type { PartySentInviteItem } from '@/types/party-invite';
+import type { LevelRangeFilter } from '@/types/level-range-filter';
 import {
   globalSlotIndexToPartyAndSlot,
   type RaidPartyDetail,
@@ -94,9 +106,7 @@ type GroupDetailTab = 'status' | 'party' | 'settings';
 type InviteModalTab = 'create' | 'sent';
 type GroupConfirmAction = 'leave' | 'delete';
 
-function partyTabCollisionDetection(
-  args: Parameters<typeof closestCenter>[0],
-) {
+function partyTabCollisionDetection(args: Parameters<typeof closestCenter>[0]) {
   const hit = pointerWithin(args);
   return hit.length > 0 ? hit : closestCenter(args);
 }
@@ -243,18 +253,27 @@ export function PartyGroupPageClient({ groupId }: Props) {
     useState(false);
   /** 공대 캐릭터 풀 정렬 순서 — 저장 시 `@/lib/party-pool-order`의 `buildPartyPoolOrderPayload(partyPoolOrderIds)` 사용 */
   const [partyPoolOrderIds, setPartyPoolOrderIds] = useState<number[]>([]);
-  const [partyPoolRows, setPartyPoolRows] = useState<PartyPoolOrderedRow[]>(
-    [],
-  );
+  const [partyPoolRows, setPartyPoolRows] = useState<PartyPoolOrderedRow[]>([]);
   const [partyPoolLoading, setPartyPoolLoading] = useState(false);
   const [partyPoolError, setPartyPoolError] = useState<string | null>(null);
+  const [levelRangeFilters, setLevelRangeFilters] = useState<LevelRangeFilter[]>(
+    []
+  );
+  const [levelRangeFiltersError, setLevelRangeFiltersError] = useState<
+    string | null
+  >(null);
+  const [selectedPosition, setSelectedPosition] = useState<PositionFilter>('ALL');
+  const [levelMinBound, setLevelMinBound] = useState(1640);
+  const [levelMaxBound, setLevelMaxBound] = useState(1800);
+  const [selectedMinLevel, setSelectedMinLevel] = useState(1640);
+  const [selectedMaxLevel, setSelectedMaxLevel] = useState(1800);
   const [partyDndActiveId, setPartyDndActiveId] = useState<string | null>(null);
   const [raidPartyAssignBusy, setRaidPartyAssignBusy] = useState<
     Record<number, boolean>
   >({});
   const raidPartyAssignFlightRef = useRef<Set<number>>(new Set());
   const [focusedRaidPartyId, setFocusedRaidPartyId] = useState<number | null>(
-    null,
+    null
   );
   const [raidPartyDeleteDraft, setRaidPartyDeleteDraft] = useState<{
     id: number;
@@ -271,7 +290,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
     [publicCharGrouped]
   );
 
-  async function loadGroupDetail(showBusy = true) {
+  const loadGroupDetail = useCallback(async (showBusy = true) => {
     if (!Number.isFinite(groupId) || groupId <= 0) {
       setError('유효하지 않은 공격대 ID 입니다.');
       setGroup(null);
@@ -294,7 +313,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
     } finally {
       if (showBusy) setBusy(false);
     }
-  }
+  }, [groupId]);
 
   const loadRaidPartyList = useCallback(async () => {
     if (!group) return;
@@ -338,14 +357,36 @@ export function PartyGroupPageClient({ groupId }: Props) {
     }
   }, [groupId]);
 
+  const loadLevelRangeFilters = useCallback(async () => {
+    setLevelRangeFiltersError(null);
+    try {
+      const list = await getLevelRangeFilters();
+      setLevelRangeFilters(list);
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '레벨 범위 필터를 불러오지 못했습니다.';
+      setLevelRangeFiltersError(msg);
+      setLevelRangeFilters([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab !== 'party' || !group) return;
     void loadPartyBuilderPool();
   }, [activeTab, group, loadPartyBuilderPool]);
 
   useEffect(() => {
+    if (activeTab !== 'party' || !group) return;
+    void loadLevelRangeFilters();
+  }, [activeTab, group, loadLevelRangeFilters]);
+
+  useEffect(() => {
     void loadGroupDetail(true);
-  }, [groupId]);
+  }, [loadGroupDetail]);
 
   useEffect(() => {
     async function loadMe() {
@@ -368,7 +409,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
     async (
       raidPartyId: number,
       slotIndex: number,
-      characterId: number,
+      characterId: number
     ): Promise<void> => {
       if (raidPartyAssignFlightRef.current.has(raidPartyId)) return;
       raidPartyAssignFlightRef.current.add(raidPartyId);
@@ -376,14 +417,13 @@ export function PartyGroupPageClient({ groupId }: Props) {
       try {
         const detailSnap = raidPartyDetails[raidPartyId];
         const listRow = raidPartyList.find((r) => r.id === raidPartyId);
-        const partySize =
-          detailSnap?.partySize ?? listRow?.partySize ?? 8;
+        const partySize = detailSnap?.partySize ?? listRow?.partySize ?? 8;
         const { partyNumber, slotNumber } = globalSlotIndexToPartyAndSlot(
           slotIndex,
-          partySize,
+          partySize
         );
         const poolRow = partyPoolRows.find(
-          (r) => r.character.id === characterId,
+          (r) => r.character.id === characterId
         );
         const positionRole = normalizePartyRole(poolRow?.character.partyRole);
 
@@ -398,8 +438,8 @@ export function PartyGroupPageClient({ groupId }: Props) {
           list.map((row) =>
             row.id === raidPartyId
               ? { ...row, placedMemberCount: updated.members.length }
-              : row,
-          ),
+              : row
+          )
         );
         setToast({ kind: 'ok', text: '파티 슬롯에 배치했습니다.' });
       } catch (err) {
@@ -415,14 +455,14 @@ export function PartyGroupPageClient({ groupId }: Props) {
         setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
       }
     },
-    [partyPoolRows, raidPartyDetails, raidPartyList],
+    [partyPoolRows, raidPartyDetails, raidPartyList]
   );
 
   const moveRaidPartyMemberToSlot = useCallback(
     async (
       raidPartyId: number,
       memberId: number,
-      targetSlotIndex: number,
+      targetSlotIndex: number
     ): Promise<void> => {
       if (raidPartyAssignFlightRef.current.has(raidPartyId)) return;
       raidPartyAssignFlightRef.current.add(raidPartyId);
@@ -434,7 +474,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
           return;
         }
         const assignment = detailSnap.members.find(
-          (m) => m.memberId === memberId,
+          (m) => m.memberId === memberId
         );
         if (!assignment?.memberId) {
           setToast({
@@ -450,21 +490,21 @@ export function PartyGroupPageClient({ groupId }: Props) {
           8;
         const { partyNumber, slotNumber } = globalSlotIndexToPartyAndSlot(
           targetSlotIndex,
-          partySize,
+          partySize
         );
         const positionRole = normalizePartyRole(assignment.character.partyRole);
         const updated = await patchRaidPartyMemberPosition(
           raidPartyId,
           memberId,
-          { partyNumber, slotNumber, positionRole },
+          { partyNumber, slotNumber, positionRole }
         );
         setRaidPartyDetails((prev) => ({ ...prev, [raidPartyId]: updated }));
         setRaidPartyList((list) =>
           list.map((row) =>
             row.id === raidPartyId
               ? { ...row, placedMemberCount: updated.members.length }
-              : row,
-          ),
+              : row
+          )
         );
         setToast({ kind: 'ok', text: '슬롯 위치를 변경했습니다.' });
       } catch (err) {
@@ -480,7 +520,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
         setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
       }
     },
-    [raidPartyDetails, raidPartyList],
+    [raidPartyDetails, raidPartyList]
   );
 
   const removeRaidPartyMemberFromSlot = useCallback(
@@ -495,8 +535,8 @@ export function PartyGroupPageClient({ groupId }: Props) {
           list.map((row) =>
             row.id === raidPartyId
               ? { ...row, placedMemberCount: updated.members.length }
-              : row,
-          ),
+              : row
+          )
         );
         setToast({ kind: 'ok', text: '파티에서 제거했습니다.' });
       } catch (err) {
@@ -512,17 +552,88 @@ export function PartyGroupPageClient({ groupId }: Props) {
         setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
       }
     },
-    [],
+    []
   );
 
   const partyPoolCanonicalIds = useMemo(
     () => partyPoolRows.map((x) => x.character.id),
-    [partyPoolRows],
+    [partyPoolRows]
+  );
+
+  useEffect(() => {
+    if (partyPoolRows.length === 0) {
+      setLevelMinBound(1640);
+      setLevelMaxBound(1800);
+      setSelectedMinLevel(1640);
+      setSelectedMaxLevel(1800);
+      return;
+    }
+    const levels = partyPoolRows.map((r) => parseItemLevel(r.character.itemAvgLevel));
+    const min = Math.floor(Math.min(...levels));
+    const max = Math.ceil(Math.max(...levels));
+    const safeMin = Number.isFinite(min) ? Math.min(min, 1640) : 1640;
+    const safeMax = Number.isFinite(max) ? Math.max(max, 1800) : 1800;
+    setLevelMinBound(safeMin);
+    setLevelMaxBound(safeMax);
+    setSelectedMinLevel(safeMin);
+    setSelectedMaxLevel(safeMax);
+  }, [partyPoolRows]);
+
+  const rowById = useMemo(() => {
+    const m = new Map<number, PartyPoolOrderedRow>();
+    for (const row of partyPoolRows) m.set(row.character.id, row);
+    return m;
+  }, [partyPoolRows]);
+
+  const orderedPartyPoolRows = useMemo(
+    () => partyPoolOrderIds.map((id) => rowById.get(id)).filter(Boolean) as PartyPoolOrderedRow[],
+    [partyPoolOrderIds, rowById]
+  );
+
+  const filteredPartyPoolRows = useMemo(() => {
+    return orderedPartyPoolRows.filter((row) => {
+      if (
+        selectedPosition !== 'ALL' &&
+        normalizePartyRole(row.character.partyRole) !== selectedPosition
+      ) {
+        return false;
+      }
+      const level = parseItemLevel(row.character.itemAvgLevel);
+      return inLevelRange(level, selectedMinLevel, selectedMaxLevel);
+    });
+  }, [orderedPartyPoolRows, selectedPosition, selectedMinLevel, selectedMaxLevel]);
+
+  const poolRenderableSections = useMemo<PartyPoolRenderableSection[]>(() => {
+    const sectionData = buildLevelRangeSections({
+      orderedRows: filteredPartyPoolRows,
+      levelRanges: levelRangeFilters,
+    });
+    const picked = sectionData
+      .filter((s) => s.characterIds.length > 0)
+      .sort((a, b) => a.orderNo - b.orderNo)
+      .map((s) => ({
+        key: String(s.id ?? 'etc'),
+        label: s.label,
+        ids: s.characterIds,
+      }));
+    if (picked.length > 0) return picked;
+    return [
+      {
+        key: 'all',
+        label: '전체',
+        ids: filteredPartyPoolRows.map((r) => r.character.id),
+      },
+    ];
+  }, [filteredPartyPoolRows, levelRangeFilters]);
+
+  const visiblePartyPoolOrderIds = useMemo(
+    () => poolRenderableSections.flatMap((s) => s.ids),
+    [poolRenderableSections]
   );
 
   const partyPoolIdsFingerprint = useMemo(
     () => [...partyPoolCanonicalIds].sort((a, b) => a - b).join(','),
-    [partyPoolCanonicalIds],
+    [partyPoolCanonicalIds]
   );
 
   const partyPoolCanonicalIdsRef = useRef(partyPoolCanonicalIds);
@@ -530,7 +641,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
 
   useLayoutEffect(() => {
     setPartyPoolOrderIds((prev) =>
-      mergePartyPoolOrderIds(prev, partyPoolCanonicalIdsRef.current),
+      mergePartyPoolOrderIds(prev, partyPoolCanonicalIdsRef.current)
     );
   }, [partyPoolIdsFingerprint]);
 
@@ -540,7 +651,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    }),
+    })
   );
 
   const partyDndActiveRow = useMemo(() => {
@@ -583,7 +694,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
         void moveRaidPartyMemberToSlot(
           fromMember.raidPartyId,
           fromMember.memberId,
-          toSlot.slotIndex,
+          toSlot.slotIndex
         );
         return;
       }
@@ -593,7 +704,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
         void assignCharacterToRaidPartySlot(
           toSlot.raidPartyId,
           toSlot.slotIndex,
-          fromPool,
+          fromPool
         );
         return;
       }
@@ -604,7 +715,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
         const newIndex = partyPoolOrderIds.indexOf(overPool);
         if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
         setPartyPoolOrderIds(
-          arrayMove([...partyPoolOrderIds], oldIndex, newIndex),
+          arrayMove([...partyPoolOrderIds], oldIndex, newIndex)
         );
       }
     },
@@ -612,7 +723,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
       assignCharacterToRaidPartySlot,
       moveRaidPartyMemberToSlot,
       partyPoolOrderIds,
-    ],
+    ]
   );
 
   const handlePartyTabDragCancel = useCallback(() => {
@@ -629,6 +740,11 @@ export function PartyGroupPageClient({ groupId }: Props) {
         m.role === 'OWNER' &&
         (typeof meUserId === 'number' ? m.userId === meUserId : true)
     );
+  }, [group, meUserId]);
+
+  const myMemberInGroup = useMemo(() => {
+    if (!group || meUserId == null) return null;
+    return group.members.find((m) => m.userId === meUserId) ?? null;
   }, [group, meUserId]);
 
   useEffect(() => {
@@ -663,7 +779,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
     setRaidPartyDetailsLoading(true);
     setRaidPartyDetailErrors({});
     void Promise.allSettled(
-      raidPartyList.map((p) => getRaidPartyById(p.id)),
+      raidPartyList.map((p) => getRaidPartyById(p.id))
     ).then((results) => {
       if (cancelled) return;
       const next: Record<number, RaidPartyDetail> = {};
@@ -703,7 +819,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
     setFocusedRaidPartyId((prev) =>
       prev != null && raidPartyList.some((r) => r.id === prev)
         ? prev
-        : raidPartyList[0]!.id,
+        : raidPartyList[0]!.id
     );
   }, [activeTab, raidPartyList]);
 
@@ -937,7 +1053,11 @@ export function PartyGroupPageClient({ groupId }: Props) {
   if (busy) {
     return (
       <div className="rounded-2xl border border-base-300 bg-base-300 p-6 text-base-content shadow-sm">
-        <p className="text-sm text-base-content/60">불러오는 중…</p>
+        <div className="space-y-3">
+          <div className="skeleton h-5 w-40" />
+          <div className="skeleton h-4 w-64" />
+          <div className="skeleton h-4 w-52" />
+        </div>
       </div>
     );
   }
@@ -1059,12 +1179,12 @@ export function PartyGroupPageClient({ groupId }: Props) {
             <div>
               <h2 className="text-lg font-semibold text-base-content">파티</h2>
               <p className="mt-1 text-sm text-base-content/60">
-                공대 캐릭터는 드래그해 순서를 바꾸거나 파티 슬롯에 놓아 배치할 수
-                있습니다. 슬롯 안 카드는 다른 슬롯으로 옮기거나(덮어쓰면 위치
+                공대 캐릭터는 드래그해 순서를 바꾸거나 파티 슬롯에 놓아 배치할
+                수 있습니다. 슬롯 안 카드는 다른 슬롯으로 옮기거나(덮어쓰면 위치
                 교환), 휴지통으로 파티에서 뺄 수 있습니다. 상단 초록 헤더 영역을
                 눌러 파티를 선택한 뒤{' '}
-                <strong className="text-base-content/75">파티 삭제</strong>
-                로 해당 레이드 파티 전체를 지울 수 있습니다. 공개 캐릭터만 목록에
+                <strong className="text-base-content/75">파티 삭제</strong>로
+                해당 레이드 파티 전체를 지울 수 있습니다. 공개 캐릭터만 목록에
                 나타납니다.
               </p>
             </div>
@@ -1085,128 +1205,156 @@ export function PartyGroupPageClient({ groupId }: Props) {
                 <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-base-content/50">
                   공대 캐릭터
                 </h3>
+                <PartyCharacterFilters
+                  position={selectedPosition}
+                  onPositionChange={setSelectedPosition}
+                  minBound={levelMinBound}
+                  maxBound={levelMaxBound}
+                  minValue={selectedMinLevel}
+                  maxValue={selectedMaxLevel}
+                  step={10}
+                  onLevelChange={({ min, max }) => {
+                    setSelectedMinLevel(min);
+                    setSelectedMaxLevel(max);
+                  }}
+                  onReset={() => {
+                    setSelectedPosition('ALL');
+                    setSelectedMinLevel(levelMinBound);
+                    setSelectedMaxLevel(levelMaxBound);
+                  }}
+                />
+                {levelRangeFiltersError ? (
+                  <p className="mt-2 rounded-lg border border-rose-900/40 bg-rose-950/20 px-2 py-2 text-[11px] text-rose-100">
+                    {levelRangeFiltersError}
+                  </p>
+                ) : null}
                 {partyPoolError ? (
-                  <p className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-3 py-6 text-center text-xs text-rose-100">
+                  <p className="mt-2 rounded-xl border border-rose-900/40 bg-rose-950/20 px-3 py-6 text-center text-xs text-rose-100">
                     {partyPoolError}
                   </p>
                 ) : partyPoolLoading ? (
-                  <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30">
-                    <span className="flex items-center gap-2 text-xs text-base-content/60">
-                      <span className="loading loading-spinner loading-sm" />
-                      캐릭터 목록 불러오는 중…
-                    </span>
+                  <div className="mt-2 rounded-xl border border-base-300 bg-base-200/30 p-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {Array.from({ length: 6 }).map((_, idx) => (
+                        <div key={idx} className="skeleton h-[76px] w-full rounded-lg" />
+                      ))}
+                    </div>
                   </div>
-                ) : partyPoolRows.length === 0 ? (
-                  <p className="rounded-xl border border-base-300 bg-base-200/40 px-3 py-6 text-center text-xs text-base-content/60">
-                    공개된 캐릭터가 없습니다. 설정 탭에서 공개 캐릭터를 등록해
+                ) : filteredPartyPoolRows.length === 0 ? (
+                  <p className="mt-2 rounded-xl border border-base-300 bg-base-200/40 px-3 py-6 text-center text-xs text-base-content/60">
+                    현재 필터 조건에 맞는 캐릭터가 없습니다. 필터를 초기화해
                     주세요.
                   </p>
                 ) : (
-                  <SortableContext
-                    items={partyPoolOrderIds.map(poolCharDndId)}
-                    strategy={rectSortingStrategy}
-                  >
-                    <PartyPoolSortableGrid
-                      rows={partyPoolRows}
-                      orderIds={partyPoolOrderIds}
-                    />
-                  </SortableContext>
+                  <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
+                    <SortableContext
+                      items={visiblePartyPoolOrderIds.map(poolCharDndId)}
+                      strategy={rectSortingStrategy}
+                    >
+                      <PartyPoolSortableGrid
+                        rows={partyPoolRows}
+                        sections={poolRenderableSections}
+                      />
+                    </SortableContext>
+                  </div>
                 )}
               </section>
 
               <section className="min-w-0 flex-1">
-              {raidPartyListError ? (
-                <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-4 py-6 text-sm text-rose-100">
-                  {raidPartyListError}
-                </div>
-              ) : raidPartyListLoading ? (
-                <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30">
-                  <span className="flex items-center gap-2 text-sm text-base-content/60">
-                    <span className="loading loading-spinner loading-md" />
-                    파티 목록 불러오는 중…
-                  </span>
-                </div>
-              ) : raidPartyList.length === 0 ? (
-                <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30 px-4 py-10 text-center">
-                  <p className="text-sm text-base-content/60">
-                    생성된 파티가 없습니다.
-                  </p>
-                  <p className="mt-1 text-xs text-base-content/45">
-                    상단{' '}
-                    <strong className="text-base-content/70">파티 생성</strong>
-                    으로 레이드를 선택해 주세요.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-4">
-                  {raidPartyList.map((p) => {
-                    const detail = raidPartyDetails[p.id];
-                    const rowErr = raidPartyDetailErrors[p.id];
-                    return (
-                      <div
-                        key={p.id}
-                        className="w-full min-w-[22rem] max-w-xl flex-[1_1_360px]"
-                      >
-                        {raidPartyDetailsLoading && !detail && !rowErr ? (
-                          <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30">
-                            <span className="flex items-center gap-2 text-sm text-base-content/60">
-                              <span className="loading loading-spinner loading-md" />
-                              불러오는 중…
-                            </span>
-                          </div>
-                        ) : rowErr ? (
-                          <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-4 py-6 text-sm text-rose-100">
-                            {rowErr}
-                          </div>
-                        ) : detail ? (
-                          <RaidPartyDetailView
-                            detail={detail}
-                            isPartySelected={focusedRaidPartyId === p.id}
-                            onSelectParty={() => setFocusedRaidPartyId(p.id)}
-                            onAssignToSlot={(slotIndex, characterId) =>
-                              void assignCharacterToRaidPartySlot(
-                                p.id,
-                                slotIndex,
-                                characterId,
-                              )
-                            }
-                            onMoveMemberToSlot={(memberId, targetSlotIndex) =>
-                              void moveRaidPartyMemberToSlot(
-                                p.id,
-                                memberId,
-                                targetSlotIndex,
-                              )
-                            }
-                            onRemoveMember={(memberId) =>
-                              void removeRaidPartyMemberFromSlot(
-                                p.id,
-                                memberId,
-                              )
-                            }
-                            onDeleteRaidParty={() =>
-                              setRaidPartyDeleteDraft({
-                                id: p.id,
-                                titleLabel:
-                                  detail.title?.trim() ||
-                                  detail.raidInfo?.raidName ||
-                                  p.raidName ||
-                                  `파티 #${p.id}`,
-                              })
-                            }
-                            deletePartyDisabled={
-                              raidPartyDeleteBusy ||
-                              (raidPartyAssignBusy[p.id] ?? false)
-                            }
-                            assignmentBusy={
-                              raidPartyAssignBusy[p.id] ?? false
-                            }
-                          />
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                {raidPartyListError ? (
+                  <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-4 py-6 text-sm text-rose-100">
+                    {raidPartyListError}
+                  </div>
+                ) : raidPartyListLoading ? (
+                  <div className="rounded-xl border border-base-300 bg-base-200/30 p-4">
+                    <div className="space-y-3">
+                      <div className="skeleton h-10 w-full rounded-lg" />
+                      <div className="skeleton h-44 w-full rounded-lg" />
+                    </div>
+                  </div>
+                ) : raidPartyList.length === 0 ? (
+                  <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200/30 px-4 py-10 text-center">
+                    <p className="text-sm text-base-content/60">
+                      생성된 파티가 없습니다.
+                    </p>
+                    <p className="mt-1 text-xs text-base-content/45">
+                      상단{' '}
+                      <strong className="text-base-content/70">
+                        파티 생성
+                      </strong>
+                      으로 레이드를 선택해 주세요.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-start gap-4">
+                    {raidPartyList.map((p) => {
+                      const detail = raidPartyDetails[p.id];
+                      const rowErr = raidPartyDetailErrors[p.id];
+                      return (
+                        <div
+                          key={p.id}
+                          className="w-[28rem] shrink-0"
+                        >
+                          {raidPartyDetailsLoading && !detail && !rowErr ? (
+                            <div className="rounded-xl border border-base-300 bg-base-200/30 p-3">
+                              <div className="space-y-2">
+                                <div className="skeleton h-10 w-full rounded-lg" />
+                                <div className="skeleton h-36 w-full rounded-lg" />
+                              </div>
+                            </div>
+                          ) : rowErr ? (
+                            <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-4 py-6 text-sm text-rose-100">
+                              {rowErr}
+                            </div>
+                          ) : detail ? (
+                            <RaidPartyDetailView
+                              detail={detail}
+                              isPartySelected={focusedRaidPartyId === p.id}
+                              onSelectParty={() => setFocusedRaidPartyId(p.id)}
+                              onAssignToSlot={(slotIndex, characterId) =>
+                                void assignCharacterToRaidPartySlot(
+                                  p.id,
+                                  slotIndex,
+                                  characterId
+                                )
+                              }
+                              onMoveMemberToSlot={(memberId, targetSlotIndex) =>
+                                void moveRaidPartyMemberToSlot(
+                                  p.id,
+                                  memberId,
+                                  targetSlotIndex
+                                )
+                              }
+                              onRemoveMember={(memberId) =>
+                                void removeRaidPartyMemberFromSlot(
+                                  p.id,
+                                  memberId
+                                )
+                              }
+                              onDeleteRaidParty={() =>
+                                setRaidPartyDeleteDraft({
+                                  id: p.id,
+                                  titleLabel:
+                                    detail.title?.trim() ||
+                                    detail.raidInfo?.raidName ||
+                                    p.raidName ||
+                                    `파티 #${p.id}`,
+                                })
+                              }
+                              deletePartyDisabled={
+                                raidPartyDeleteBusy ||
+                                (raidPartyAssignBusy[p.id] ?? false)
+                              }
+                              assignmentBusy={
+                                raidPartyAssignBusy[p.id] ?? false
+                              }
+                            />
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
             </div>
             <DragOverlay dropAnimation={null}>
@@ -1264,34 +1412,39 @@ export function PartyGroupPageClient({ groupId }: Props) {
               수정 후 저장하면 최신 공대원 정보로 다시 조회됩니다.
             </p>
             <div className="mt-3 space-y-2">
-              {group.members.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-2 rounded-lg border border-base-300 bg-base-300/60 px-2 py-2"
-                >
+              {myMemberInGroup ? (
+                <div className="flex items-center gap-2 rounded-lg border border-base-300 bg-base-300/60 px-2 py-2">
                   <input
                     type="text"
-                    value={nicknameDrafts[m.id] ?? ''}
+                    value={nicknameDrafts[myMemberInGroup.id] ?? ''}
                     onChange={(e) =>
                       setNicknameDrafts((prev) => ({
                         ...prev,
-                        [m.id]: e.target.value,
+                        [myMemberInGroup.id]: e.target.value,
                       }))
                     }
                     className="input input-bordered min-w-0 flex-1 border-base-300 bg-base-300 text-sm text-base-content placeholder:text-base-content/70"
-                    placeholder={m.nickname?.trim() ? m.nickname : '별명 없음'}
-                    disabled={nicknameBusyMemberId === m.id}
+                    placeholder={
+                      myMemberInGroup.nickname?.trim()
+                        ? myMemberInGroup.nickname
+                        : '별명 없음'
+                    }
+                    disabled={nicknameBusyMemberId === myMemberInGroup.id}
                   />
                   <button
                     type="button"
                     className="btn btn-sm shrink-0 border-primary/40 bg-indigo-950/40 text-indigo-200 hover:bg-indigo-900/60"
                     disabled={nicknameBusyMemberId !== null}
-                    onClick={() => void onSaveNickname(m.id)}
+                    onClick={() => void onSaveNickname(myMemberInGroup.id)}
                   >
-                    {nicknameBusyMemberId === m.id ? '저장 중…' : '저장'}
+                    {nicknameBusyMemberId === myMemberInGroup.id ? '저장 중…' : '저장'}
                   </button>
                 </div>
-              ))}
+              ) : (
+                <p className="rounded-lg border border-base-300 bg-base-300/40 px-3 py-2 text-xs text-base-content/70">
+                  내 멤버 정보를 확인할 수 없습니다. 새로고침 후 다시 시도해 주세요.
+                </p>
+              )}
             </div>
           </div>
           <div className="mt-5 rounded-xl border border-base-300 bg-base-200/40 p-4">

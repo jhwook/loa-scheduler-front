@@ -122,7 +122,6 @@ function DraggablePlacedCard({
           }}
           draggable={false}
           className="w-full"
-          variant="slot"
           headerTrailing={
             onRemove ? (
               <RemovePlacedButton onRemove={onRemove} disabled={disabled} />
@@ -145,11 +144,11 @@ function EmptySlotPlaceholder() {
         className="invisible flex min-w-0 w-full flex-col overflow-visible rounded-lg"
         aria-hidden
       >
-        <div className="flex min-w-0 items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold leading-snug">
+        <div className="flex min-w-0 items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold leading-tight">
           <span className="min-w-0 flex-1 truncate text-center">빈 슬롯</span>
           <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center" />
         </div>
-        <div className="flex items-start gap-2 px-2.5 pb-2 pt-1.5">
+        <div className="flex items-start gap-2 px-2.5 py-1.5">
           <div className="h-9 w-9 shrink-0 rounded-full" aria-hidden />
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="min-h-[2.125rem] text-[12px] leading-snug" aria-hidden />
@@ -213,7 +212,6 @@ function SlotBody({
             }}
             draggable={false}
             className="w-full"
-            variant="slot"
             headerTrailing={
               removeHandler ? (
                 <RemovePlacedButton
@@ -382,10 +380,10 @@ export function RaidPartySlotGrid({
   onRemovePlacedMember,
 }: Props) {
   const isEight = cells.length === 8;
-  /** items-start + 셀 높이는 콘텐츠 기준 — 빈 슬롯은 카드와 비슷한 min-height만 사용 */
+  /** 카드 본체 너비를 공대 캐릭터 카드와 동일하게 유지 */
   const cellClass = isEight
-    ? "flex w-full min-w-0 flex-col rounded-sm border border-base-300/90 bg-base-200/90 p-0.5 sm:p-1"
-    : "flex w-full min-w-0 flex-col rounded-sm border border-base-300/90 bg-base-200/90 p-0.5 sm:p-1";
+    ? "flex w-full min-w-0 flex-col rounded-sm border border-base-300/90 bg-base-200/90"
+    : "flex w-full min-w-0 flex-col rounded-sm border border-base-300/90 bg-base-200/90";
 
   const dndKit =
     Boolean(useDndKitDrop && onDropCharacter && raidPartyId != null) &&
@@ -405,7 +403,7 @@ export function RaidPartySlotGrid({
           {label}
         </div>
       ) : null}
-      <div className="grid grid-cols-2 items-start gap-1 p-1 sm:gap-1.5 sm:p-1.5 sm:bg-base-300">
+      <div className="grid grid-cols-2 items-start gap-1 p-0 sm:gap-1 sm:bg-base-300">
         {cells.map((cell, i) => {
           if (dndKit && raidPartyId != null && onDropCharacter) {
             return (

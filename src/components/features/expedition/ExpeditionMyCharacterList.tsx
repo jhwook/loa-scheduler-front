@@ -206,8 +206,19 @@ export function ExpeditionMyCharacterList() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white/80 px-6 py-10 text-center text-sm text-slate-500 shadow-sm">
-        캐릭터 목록을 불러오는 중…
+      <div className="rounded-2xl border border-base-300 bg-base-200/80 px-6 py-6 shadow-sm">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="skeleton h-5 w-28" />
+            <div className="skeleton h-8 w-24 rounded-lg" />
+          </div>
+          <div className="skeleton h-10 w-full rounded-lg" />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="skeleton h-28 w-full rounded-xl" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -233,7 +244,7 @@ export function ExpeditionMyCharacterList() {
         아직 저장된 캐릭터가 없습니다.
         <br />
         <span className="text-xs text-slate-400">
-          우측 상단 <strong className="text-slate-600">+ 원정대 추가</strong>로
+          우측 상단 <strong className="text-slate-600">+ 캐릭터 추가</strong>로
           검색·저장해 보세요.
         </span>
       </div>

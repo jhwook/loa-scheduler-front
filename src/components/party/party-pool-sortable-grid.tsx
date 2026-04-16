@@ -1,75 +1,77 @@
-"use client";
+'use client';
 
-import { useMemo } from "react";
+import { useMemo } from 'react';
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
-import { PartyPoolCharacterCard } from "@/components/party/party-pool-character-card";
-import { poolCharDndId } from "@/lib/party-tab-dnd-ids";
-import type { PartyPoolOrderedRow } from "@/lib/party-pool-order";
+import { PartyCharacterSection } from '@/components/party-builder/party-character-section';
+import { PartyPoolCharacterCard } from '@/components/party/party-pool-character-card';
+import { poolCharDndId } from '@/lib/party-tab-dnd-ids';
+import type { PartyPoolOrderedRow } from '@/lib/party-pool-order';
 
-type Props = {
-  rows: readonly PartyPoolOrderedRow[];
-  orderIds: readonly number[];
+export type PartyPoolRenderableSection = {
+  key: string;
+  label: string;
+  ids: readonly number[];
 };
 
-/** 부모에 DndContext + SortableContext(items=orderIds.map(poolCharDndId)) 필요. */
-function SortablePoolCard({
-  characterId,
-  row,
-}: {
-  characterId: number;
+type SortablePoolCardProps = {
   row: PartyPoolOrderedRow;
-}) {
-  const dndId = poolCharDndId(characterId);
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: dndId });
+};
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+function SortablePoolCard({ row }: SortablePoolCardProps) {
+  const sortableId = poolCharDndId(row.character.id);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: sortableId });
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`min-w-0 touch-none cursor-grab active:cursor-grabbing ${isDragging ? "z-10 opacity-45" : ""}`}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={`min-w-0 touch-none cursor-grab active:cursor-grabbing ${isDragging ? 'z-10 opacity-45' : ''}`}
     >
-      <PartyPoolCharacterCard
-        memberNickname={row.ownerDisplayName}
-        character={row.character}
-        draggable={false}
-      />
+      <div {...attributes} {...listeners}>
+        <PartyPoolCharacterCard
+          memberNickname={row.ownerDisplayName}
+          character={row.character}
+          draggable={false}
+        />
+      </div>
     </div>
   );
 }
 
-export function PartyPoolSortableGrid({ rows, orderIds }: Props) {
-  const rowById = useMemo(() => {
-    const m = new Map<number, PartyPoolOrderedRow>();
-    for (const r of rows) {
-      m.set(r.character.id, r);
-    }
-    return m;
-  }, [rows]);
+type Props = {
+  rows: readonly PartyPoolOrderedRow[];
+  sections: readonly PartyPoolRenderableSection[];
+};
+
+export function PartyPoolSortableGrid({ rows, sections }: Props) {
+  const rowsById = useMemo(
+    () => new Map(rows.map((row) => [row.character.id, row] as const)),
+    [rows],
+  );
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {orderIds.map((id) => {
-        const row = rowById.get(id);
-        if (!row) return null;
+    <div className="space-y-3">
+      {sections.map((section) => {
+        if (section.ids.length === 0) return null;
+
         return (
-          <SortablePoolCard key={id} characterId={id} row={row} />
+          <section key={section.key}>
+            <PartyCharacterSection label={section.label} count={section.ids.length} />
+            <div className="grid grid-cols-2 gap-2">
+              {section.ids.map((id) => {
+                const row = rowsById.get(id);
+                if (!row) return null;
+                return <SortablePoolCard key={id} row={row} />;
+              })}
+            </div>
+          </section>
         );
       })}
     </div>

@@ -68,14 +68,22 @@ export function LevelRangeFilterFormModal({
 
   if (!open) return null;
 
-  function parseIntStrict(s: string, field: string): number | null {
+  function parseNumberStrict(
+    s: string,
+    field: string,
+    options?: { integerOnly?: boolean },
+  ): number | null {
     const t = s.trim();
     if (!t) {
       setLocalError(`${field}을(를) 입력해 주세요.`);
       return null;
     }
     const n = Number(t);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    if (!Number.isFinite(n)) {
+      setLocalError(`${field}은(는) 숫자여야 합니다.`);
+      return null;
+    }
+    if (options?.integerOnly && !Number.isInteger(n)) {
       setLocalError(`${field}은(는) 정수여야 합니다.`);
       return null;
     }
@@ -92,18 +100,19 @@ export function LevelRangeFilterFormModal({
       return;
     }
 
-    const minLevel = parseIntStrict(draft.minLevel, '최소 레벨');
+    const minLevel = parseNumberStrict(draft.minLevel, '최소 레벨');
     if (minLevel === null) return;
 
-    const orderNo = parseIntStrict(draft.orderNo, '정렬 순서');
+    const orderNo = parseNumberStrict(draft.orderNo, '정렬 순서', {
+      integerOnly: true,
+    });
     if (orderNo === null) return;
 
     let maxLevel: number | null = null;
     const maxRaw = draft.maxLevel.trim();
     if (maxRaw) {
-      const n = Number(maxRaw);
-      if (!Number.isFinite(n) || !Number.isInteger(n)) {
-        setLocalError('최대 레벨은 정수이거나 비워 두어야 합니다.');
+      const n = parseNumberStrict(maxRaw, '최대 레벨');
+      if (n === null) {
         return;
       }
       maxLevel = n;
@@ -169,6 +178,7 @@ export function LevelRangeFilterFormModal({
               </span>
               <input
                 type="number"
+                step="0.01"
                 inputMode="numeric"
                 className="input input-bordered input-sm w-full border-base-300 bg-base-300 text-base-content"
                 value={draft.minLevel}
@@ -184,6 +194,7 @@ export function LevelRangeFilterFormModal({
               </span>
               <input
                 type="number"
+                step="0.01"
                 inputMode="numeric"
                 className="input input-bordered input-sm w-full border-base-300 bg-base-300 text-base-content"
                 value={draft.maxLevel}
