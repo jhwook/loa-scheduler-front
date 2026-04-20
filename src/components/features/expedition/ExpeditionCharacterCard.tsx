@@ -403,6 +403,23 @@ export function ExpeditionCharacterCard({
       (clearGoldProgress.current / clearGoldProgress.total) * 100
     );
   }, [clearGoldProgress]);
+  const extraRewardProgress = useMemo(() => {
+    if (clearGoldProgress.total <= 0) {
+      return { amount: 0, percent: 0 };
+    }
+    const selectedExtraAmount = weeklyRaids.reduce((acc, row) => {
+      if (!row.isCleared || !row.isExtraRewardSelected) return acc;
+      const extraCost =
+        row.extraRewardCostSnapshot ?? row.raidGateInfo.extraRewardCost ?? 0;
+      return acc + Math.max(0, extraCost);
+    }, 0);
+    const remain = Math.max(0, clearGoldProgress.total - clearGoldProgress.current);
+    const amount = Math.min(remain, selectedExtraAmount);
+    return {
+      amount,
+      percent: Math.min(100, (amount / clearGoldProgress.total) * 100),
+    };
+  }, [clearGoldProgress, weeklyRaids]);
   const targetCurrentClearGold = clearGoldProgress.current;
 
   useEffect(() => {
@@ -733,10 +750,21 @@ export function ExpeditionCharacterCard({
             </span>
           </p>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-base-content/20">
-            <div
-              className="h-full rounded-full bg-amber-400 transition-all duration-300"
-              style={{ width: `${clearGoldProgressPercent}%` }}
-            />
+            <div className="flex h-full w-full">
+              <div
+                className="h-full bg-amber-400 transition-all duration-300"
+                style={{ width: `${clearGoldProgressPercent}%` }}
+              />
+              <div
+                className="h-full bg-emerald-400/90 transition-all duration-300"
+                style={{ width: `${extraRewardProgress.percent}%` }}
+                title={
+                  extraRewardProgress.amount > 0
+                    ? `더보기 비용 ${extraRewardProgress.amount.toLocaleString()}G`
+                    : undefined
+                }
+              />
+            </div>
           </div>
         </div>
 
