@@ -288,6 +288,10 @@ export function PartyGroupPageClient({ groupId }: Props) {
   const [selectedDifficultyFilter, setSelectedDifficultyFilter] = useState<
     string | null
   >(null);
+  const [myPartyOnly, setMyPartyOnly] = useState(false);
+  const [selectedMyCharacterId, setSelectedMyCharacterId] = useState<
+    number | null
+  >(null);
   const [favoriteBusyUserIds, setFavoriteBusyUserIds] = useState<Set<number>>(
     new Set()
   );
@@ -910,6 +914,25 @@ export function PartyGroupPageClient({ groupId }: Props) {
     return new Set((myMemberInGroup?.characters ?? []).map((c) => c.id));
   }, [myMemberInGroup]);
 
+  const myCharacterFilterOptions = useMemo(() => {
+    return (myMemberInGroup?.characters ?? []).map((c) => ({
+      id: c.id,
+      name: c.characterName?.trim() || `캐릭터 #${c.id}`,
+    }));
+  }, [myMemberInGroup]);
+
+  const favoriteCharacterIds = useMemo(() => {
+    const set = new Set<number>();
+    if (!group) return set;
+    for (const member of group.members) {
+      const isMine =
+        meUserId != null ? member.userId === meUserId : Boolean(member.isMe);
+      if (isMine || !member.isFavorite) continue;
+      for (const c of member.characters) set.add(c.id);
+    }
+    return set;
+  }, [group, meUserId]);
+
   const statusMembers = useMemo(() => {
     if (!group) return [];
     const mine: typeof group.members = [];
@@ -976,9 +999,37 @@ export function PartyGroupPageClient({ groupId }: Props) {
       ) {
         return false;
       }
+      if (myPartyOnly || selectedMyCharacterId != null) {
+        const detail = raidPartyDetails[party.id];
+        if (!detail) {
+          return raidPartyDetailsLoading;
+        }
+        const hasMyCharacter = detail.members.some((m) =>
+          myCharacterIds.has(m.character.id)
+        );
+        if (!hasMyCharacter) return false;
+      }
+      if (selectedMyCharacterId != null) {
+        const detail = raidPartyDetails[party.id];
+        if (!detail) {
+          return raidPartyDetailsLoading;
+        }
+        return detail.members.some(
+          (m) => m.character.id === selectedMyCharacterId
+        );
+      }
       return true;
     });
-  }, [raidPartyList, selectedRaidInfoFilterId, selectedDifficultyFilter]);
+  }, [
+    myCharacterIds,
+    myPartyOnly,
+    raidPartyDetails,
+    raidPartyDetailsLoading,
+    raidPartyList,
+    selectedDifficultyFilter,
+    selectedMyCharacterId,
+    selectedRaidInfoFilterId,
+  ]);
 
   useEffect(() => {
     if (
@@ -988,6 +1039,14 @@ export function PartyGroupPageClient({ groupId }: Props) {
       setSelectedDifficultyFilter(null);
     }
   }, [difficultyFilterOptions, selectedDifficultyFilter]);
+
+  useEffect(() => {
+    if (selectedMyCharacterId == null) return;
+    if (myCharacterFilterOptions.some((x) => x.id === selectedMyCharacterId)) {
+      return;
+    }
+    setSelectedMyCharacterId(null);
+  }, [myCharacterFilterOptions, selectedMyCharacterId]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1517,6 +1576,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
                         rows={partyPoolDisplayRows}
                         sections={poolRenderableSections}
                         myCharacterIds={myCharacterIds}
+                        favoriteCharacterIds={favoriteCharacterIds}
                       />
                     </SortableContext>
                   </div>
@@ -1623,8 +1683,52 @@ export function PartyGroupPageClient({ groupId }: Props) {
                           ))}
                         </div>
                       </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="badge badge-ghost text-xs">내 캐릭터</span>
+                        <button
+                          type="button"
+                          className={`btn btn-xs sm:btn-sm ${
+                            myPartyOnly
+                              ? 'btn-accent text-accent-content'
+                              : 'btn-outline border-base-300 text-base-content'
+                          }`}
+                          onClick={() => {
+                            setMyPartyOnly((prev) => {
+                              const next = !prev;
+                              if (!next) setSelectedMyCharacterId(null);
+                              return next;
+                            });
+                          }}
+                        >
+                          my
+                        </button>
+                        <select
+                          className="select select-xs sm:select-sm select-bordered border-base-300 bg-base-300 text-base-content"
+                          value={selectedMyCharacterId ?? ''}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const nextId = raw ? Number(raw) : null;
+                            setSelectedMyCharacterId(
+                              nextId != null && Number.isFinite(nextId)
+                                ? nextId
+                                : null
+                            );
+                            if (raw) setMyPartyOnly(true);
+                          }}
+                          disabled={myCharacterFilterOptions.length === 0}
+                        >
+                          <option value="">내 캐릭터 전체</option>
+                          {myCharacterFilterOptions.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       {selectedRaidInfoFilterId != null ||
-                      selectedDifficultyFilter ? (
+                      selectedDifficultyFilter ||
+                      myPartyOnly ||
+                      selectedMyCharacterId != null ? (
                         <div className="mt-2 flex items-center gap-2">
                           <button
                             type="button"
@@ -1632,6 +1736,8 @@ export function PartyGroupPageClient({ groupId }: Props) {
                             onClick={() => {
                               setSelectedRaidInfoFilterId(null);
                               setSelectedDifficultyFilter(null);
+                              setMyPartyOnly(false);
+                              setSelectedMyCharacterId(null);
                             }}
                           >
                             필터 초기화
@@ -1768,9 +1874,21 @@ export function PartyGroupPageClient({ groupId }: Props) {
                     character={partyDndActiveRow.character}
                     draggable={false}
                     headerTrailing={
-                      myCharacterIds.has(partyDndActiveRow.character.id) ? (
-                        <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
-                          my
+                      myCharacterIds.has(partyDndActiveRow.character.id) ||
+                      favoriteCharacterIds.has(partyDndActiveRow.character.id) ? (
+                        <span className="flex items-center gap-1">
+                          {favoriteCharacterIds.has(
+                            partyDndActiveRow.character.id,
+                          ) ? (
+                            <span className="text-xs leading-none text-warning">
+                              ★
+                            </span>
+                          ) : null}
+                          {myCharacterIds.has(partyDndActiveRow.character.id) ? (
+                            <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
+                              my
+                            </span>
+                          ) : null}
                         </span>
                       ) : undefined
                     }

@@ -19,9 +19,10 @@ export type PartyPoolRenderableSection = {
 type SortablePoolCardProps = {
   row: PartyPoolOrderedRow;
   isMine: boolean;
+  isFavoriteOwner: boolean;
 };
 
-function SortablePoolCard({ row, isMine }: SortablePoolCardProps) {
+function SortablePoolCard({ row, isMine, isFavoriteOwner }: SortablePoolCardProps) {
   const sortableId = poolCharDndId(row.character.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: sortableId });
@@ -41,9 +42,18 @@ function SortablePoolCard({ row, isMine }: SortablePoolCardProps) {
           character={row.character}
           draggable={false}
           headerTrailing={
-            isMine ? (
-              <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
-                my
+            isMine || isFavoriteOwner ? (
+              <span className="flex items-center gap-1">
+                {isFavoriteOwner ? (
+                  <span className="text-xs leading-none text-warning">
+                    ★
+                  </span>
+                ) : null}
+                {isMine ? (
+                  <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
+                    my
+                  </span>
+                ) : null}
               </span>
             ) : undefined
           }
@@ -57,9 +67,15 @@ type Props = {
   rows: readonly PartyPoolOrderedRow[];
   sections: readonly PartyPoolRenderableSection[];
   myCharacterIds?: ReadonlySet<number>;
+  favoriteCharacterIds?: ReadonlySet<number>;
 };
 
-export function PartyPoolSortableGrid({ rows, sections, myCharacterIds }: Props) {
+export function PartyPoolSortableGrid({
+  rows,
+  sections,
+  myCharacterIds,
+  favoriteCharacterIds,
+}: Props) {
   const rowsById = useMemo(
     () => new Map(rows.map((row) => [row.character.id, row] as const)),
     [rows],
@@ -82,6 +98,9 @@ export function PartyPoolSortableGrid({ rows, sections, myCharacterIds }: Props)
                     key={id}
                     row={row}
                     isMine={Boolean(myCharacterIds?.has(row.character.id))}
+                    isFavoriteOwner={Boolean(
+                      favoriteCharacterIds?.has(row.character.id),
+                    )}
                   />
                 );
               })}
