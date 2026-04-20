@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { getMe } from "@/lib/api/users";
-import { getAccessToken } from "@/lib/auth/storage";
+import { hasAuthSession } from "@/lib/auth/storage";
 
 type Props = {
   children: React.ReactNode;
@@ -36,7 +36,7 @@ export function RequireAdmin({ children }: Props) {
     let alive = true;
 
     async function check() {
-      if (!getAccessToken()) {
+      if (!hasAuthSession()) {
         router.replace("/login");
         return;
       }

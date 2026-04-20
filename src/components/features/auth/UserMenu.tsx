@@ -10,7 +10,7 @@ import {
   rejectPartyGroupInvite,
 } from '@/lib/api/party-group-invites';
 import { logoutApi } from '@/lib/api/auth';
-import { clearAuthStorage, getAccessToken } from '@/lib/auth/storage';
+import { clearAuthStorage, hasAuthSession } from '@/lib/auth/storage';
 import {
   checkNicknameAvailability,
   getMe,
@@ -162,8 +162,7 @@ export function UserMenu() {
 
   useEffect(() => {
     setMounted(true);
-    const token = getAccessToken();
-    if (!token) {
+    if (!hasAuthSession()) {
       setIsLoggedIn(false);
       setNickname(null);
       setProfileImageUrl(null);

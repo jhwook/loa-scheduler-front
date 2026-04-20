@@ -106,6 +106,15 @@ export type CreateCharacterWeeklyRaidsRequest = {
 /** PUT /characters/:characterId/weekly-raids — 본문 형태는 POST와 동일 */
 export type PutCharacterWeeklyRaidsRequest = CreateCharacterWeeklyRaidsRequest;
 
+export type CharacterWeeklyRaidOrderItem = {
+  raidInfoId: number;
+  orderNo: number;
+};
+
+export type PatchCharacterWeeklyRaidsOrderRequest = {
+  raidOrders: CharacterWeeklyRaidOrderItem[];
+};
+
 /** DELETE /characters/:characterId/weekly-raids/raid */
 export type DeleteCharacterWeeklyRaidsByRaidRequest = {
   raidInfoId: number;

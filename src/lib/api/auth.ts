@@ -5,6 +5,8 @@ import type { LoginRequest, LoginResponse, SignupRequest } from "@/types/auth";
 type RawLoginResponse = {
   accessToken?: string;
   token?: string;
+  refreshToken?: string;
+  refresh_token?: string;
   expiresIn?: number;
   hasApiToken?: boolean | string | number | null;
   lostarkApiToken?: string | null;
@@ -79,8 +81,19 @@ export async function loginApi(credentials: LoginRequest): Promise<LoginResponse
     throw new Error("Login response did not include accessToken or token");
   }
 
+  const refreshToken =
+    typeof raw.refreshToken === "string" && raw.refreshToken.trim()
+      ? raw.refreshToken.trim()
+      : typeof raw.refresh_token === "string" && raw.refresh_token.trim()
+        ? raw.refresh_token.trim()
+        : null;
+  if (!refreshToken) {
+    throw new Error("Login response did not include refreshToken");
+  }
+
   return {
     accessToken,
+    refreshToken,
     expiresIn: raw.expiresIn,
     hasApiToken: pickHasApiToken(raw),
     lostarkApiToken: pickLostarkApiToken(raw),

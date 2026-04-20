@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   deleteCharacterWeeklyRaidsByRaid,
   getRaidInfoDetail,
-  putCharacterWeeklyRaids,
+  putCharacterWeeklyRaidsByRaid,
 } from "@/lib/api/raid";
 import { ApiError } from "@/types/api";
 import type {
@@ -21,8 +21,6 @@ import { RaidDifficultySection } from "./raid-difficulty-section";
 type Props = {
   open: boolean;
   characterId: number;
-  /** 캐릭터 전체 주간 레이드 (다른 레이드는 PUT 시 유지용) */
-  allWeeklyRows: CharacterWeeklyRaidItem[];
   raidId: number | null;
   raidName: string;
   weeklyRows: CharacterWeeklyRaidItem[];
@@ -32,10 +30,19 @@ type Props = {
 
 type SelectionState = Record<number, { selected: boolean; extra: boolean }>;
 
+function resolveRaidGateInfoId(row: CharacterWeeklyRaidItem): number | null {
+  const raw = (
+    row as CharacterWeeklyRaidItem & { raidGateInfold?: unknown }
+  ).raidGateInfoId ??
+    (row as CharacterWeeklyRaidItem & { raidGateInfold?: unknown }).raidGateInfold ??
+    row.raidGateInfo?.id;
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
 export function EditWeeklyRaidModal({
   open,
   characterId,
-  allWeeklyRows,
   raidId,
   raidName,
   weeklyRows,
@@ -65,14 +72,6 @@ export function EditWeeklyRaidModal({
     }
   }, [open]);
 
-  const weeklyMap = useMemo(() => {
-    const map = new Map<number, CharacterWeeklyRaidItem>();
-    for (const row of weeklyRows) {
-      map.set(row.raidGateInfoId, row);
-    }
-    return map;
-  }, [weeklyRows]);
-
   const gateNoByGateId = useMemo(() => {
     const map = new Map<number, number>();
     if (!detail) return map;
@@ -98,7 +97,9 @@ export function EditWeeklyRaidModal({
         setDetail(d);
         const init: SelectionState = {};
         for (const row of weeklyRows) {
-          init[row.raidGateInfoId] = {
+          const gateId = resolveRaidGateInfoId(row);
+          if (gateId === null) continue;
+          init[gateId] = {
             selected: true,
             extra: row.isExtraRewardSelected,
           };
@@ -121,7 +122,7 @@ export function EditWeeklyRaidModal({
     return () => {
       alive = false;
     };
-  }, [open, raidId, weeklyMap, weeklyRows]);
+  }, [open, raidId, weeklyRows]);
 
   async function handleSave() {
     setSaving(true);
@@ -152,31 +153,35 @@ export function EditWeeklyRaidModal({
         return;
       }
 
-      const currentRaidSelections: WeeklyRaidGateSelection[] = [];
-      if (detail && raidId !== null) {
-        for (const section of detail.difficulties) {
-          for (const gate of section.gates) {
-            const state = selection[gate.raidGateInfoId];
-            if (state?.selected) {
-              currentRaidSelections.push({
-                raidGateInfoId: gate.raidGateInfoId,
-                isExtraRewardSelected: Boolean(state.extra),
-              });
-            }
-          }
-        }
+      const currentRaidSelections: WeeklyRaidGateSelection[] = detail
+        ? detail.difficulties.flatMap((section) =>
+            section.gates
+              .filter((gate) => selection[gate.raidGateInfoId]?.selected)
+              .map((gate) => ({
+                raidGateInfoId: Number(gate.raidGateInfoId),
+                isExtraRewardSelected: Boolean(
+                  selection[gate.raidGateInfoId]?.extra ?? false,
+                ),
+              }))
+              .filter(
+                (row) =>
+                  Number.isInteger(row.raidGateInfoId) && row.raidGateInfoId > 0,
+              ),
+          )
+        : [];
+
+      const payload = {
+        raidGateSelections: currentRaidSelections,
+      };
+      console.log(
+        'weekly raid update payload',
+        JSON.stringify(payload, null, 2),
+      );
+      if (raidId == null) {
+        setError("수정할 레이드 정보를 찾을 수 없습니다.");
+        return;
       }
-
-      const otherRaidSelections: WeeklyRaidGateSelection[] = allWeeklyRows
-        .filter((row) => row.raidGateInfo.raidInfo.id !== raidId)
-        .map((row) => ({
-          raidGateInfoId: row.raidGateInfoId,
-          isExtraRewardSelected: row.isExtraRewardSelected,
-        }));
-
-      await putCharacterWeeklyRaids(characterId, {
-        raidGateSelections: [...otherRaidSelections, ...currentRaidSelections],
-      });
+      await putCharacterWeeklyRaidsByRaid(characterId, raidId, payload);
       onSaved();
       onClose();
     } catch (err) {

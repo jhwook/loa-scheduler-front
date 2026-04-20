@@ -6,10 +6,11 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { loginApi } from "@/lib/api/auth";
 import {
-  getAccessToken,
+  hasAuthSession,
   setAccessToken,
   setHasApiToken,
   setLostarkApiToken,
+  setRefreshToken,
 } from "@/lib/auth/storage";
 import { ApiError } from "@/types/api";
 
@@ -23,7 +24,7 @@ export function LoginForm() {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    if (getAccessToken()) {
+    if (hasAuthSession()) {
       router.replace("/expedition");
     }
   }, [router]);
@@ -45,11 +46,13 @@ export function LoginForm() {
 
     setPending(true);
     try {
-      const { accessToken, hasApiToken, lostarkApiToken } = await loginApi({
+      const { accessToken, refreshToken, hasApiToken, lostarkApiToken } =
+        await loginApi({
         username: id,
         password: pw,
       });
       setAccessToken(accessToken);
+      setRefreshToken(refreshToken);
       setHasApiToken(hasApiToken);
       setLostarkApiToken(lostarkApiToken ?? null);
       router.replace("/expedition");

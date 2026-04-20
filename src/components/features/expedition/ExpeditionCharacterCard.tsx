@@ -1,12 +1,25 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 import { SupporterRoleMark } from '@/components/ui/supporter-role-mark';
 import { AddRaidModal } from '@/components/raid/add-raid-modal';
 import { EditWeeklyRaidModal } from '@/components/raid/edit-weekly-raid-modal';
 import { deleteCharacter, patchCharacterPartyRole } from '@/lib/api/expedition';
-import { patchCharacterWeeklyRaidClear } from '@/lib/api/raid';
+import {
+  patchCharacterWeeklyRaidClear,
+  patchCharacterWeeklyRaidsOrder,
+} from '@/lib/api/raid';
 import { getClassIconSrc, resolveClassIconBasename } from '@/lib/class-icon';
 import { ApiError } from '@/types/api';
 import type { MySavedCharacter, PartyRole } from '@/types/expedition';
@@ -33,6 +46,55 @@ type Props = {
   /** 역할 변경 성공 시 부모 대시보드 상태만 갱신 (전체 재조회 없음) */
   onPartyRoleUpdated?: (characterId: number, partyRole: PartyRole) => void;
 };
+
+type WeeklyRaidGroup = {
+  raidName: string;
+  raidId: number;
+  items: CharacterWeeklyRaidItem[];
+};
+
+function raidGroupSortableId(raidId: number): string {
+  return `raid-group-${raidId}`;
+}
+
+function parseRaidIdFromSortableId(value: string): number | null {
+  if (!value.startsWith('raid-group-')) return null;
+  const n = Number(value.slice('raid-group-'.length));
+  return Number.isFinite(n) ? n : null;
+}
+
+function SortableRaidGroup({
+  raidId,
+  disabled,
+  className,
+  children,
+}: {
+  raidId: number;
+  disabled: boolean;
+  className: string;
+  children: ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: raidGroupSortableId(raidId),
+      disabled,
+    });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={`${className} touch-none ${isDragging ? 'z-10 opacity-60' : ''} ${disabled ? 'cursor-progress' : 'cursor-grab active:cursor-grabbing'}`}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  );
+}
 
 function InlineSpinner({ className }: { className?: string }) {
   return (
@@ -138,6 +200,13 @@ export function ExpeditionCharacterCard({
   );
   const [animatedCurrentClearGold, setAnimatedCurrentClearGold] = useState(0);
   const animatedCurrentClearGoldRef = useRef(0);
+  const [raidOrderIds, setRaidOrderIds] = useState<number[]>([]);
+  const [raidOrderSaving, setRaidOrderSaving] = useState(false);
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
   const src = c.characterImage?.trim();
   const showImage = Boolean(src) && !imageFailed;
   const lvText = formatLvText(c.itemAvgLevel);
@@ -218,22 +287,13 @@ export function ExpeditionCharacterCard({
     setWeeklyRaids(weeklyRaidsProp);
   }, [weeklyRaidsProp]);
 
-  const raidGroups = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        raidName: string;
-        raidId: number;
-        orderNo: number;
-        items: CharacterWeeklyRaidItem[];
-      }
-    >();
+  const raidGroups = useMemo<WeeklyRaidGroup[]>(() => {
+    const map = new Map<string, WeeklyRaidGroup>();
     for (const row of weeklyRaids) {
       const raidName = row.raidGateInfo.raidInfo.raidName;
       const prev = map.get(raidName) ?? {
         raidName,
         raidId: row.raidGateInfo.raidInfo.id,
-        orderNo: row.raidGateInfo.raidInfo.orderNo ?? 999,
         items: [],
       };
       prev.items.push(row);
@@ -245,9 +305,63 @@ export function ExpeditionCharacterCard({
         items: [...g.items].sort(
           (a, b) => a.raidGateInfo.gateNumber - b.raidGateInfo.gateNumber
         ),
-      }))
-      .sort((a, b) => a.orderNo - b.orderNo);
+      }));
   }, [weeklyRaids]);
+
+  useEffect(() => {
+    const canonicalIds = raidGroups.map((g) => g.raidId);
+    setRaidOrderIds((prev) => {
+      const kept = prev.filter((id) => canonicalIds.includes(id));
+      const missing = canonicalIds.filter((id) => !kept.includes(id));
+      return [...kept, ...missing];
+    });
+  }, [raidGroups]);
+
+  const orderedRaidGroups = useMemo(() => {
+    const map = new Map(raidGroups.map((g) => [g.raidId, g] as const));
+    const ordered = raidOrderIds
+      .map((id) => map.get(id))
+      .filter((x): x is NonNullable<typeof x> => Boolean(x));
+    if (ordered.length === raidGroups.length) return ordered;
+    return raidGroups;
+  }, [raidGroups, raidOrderIds]);
+
+  async function persistRaidOrder(next: number[], before: number[]) {
+    setRaidOrderSaving(true);
+    try {
+      await patchCharacterWeeklyRaidsOrder(c.id, {
+        raidOrders: next.map((raidInfoId, index) => ({
+          raidInfoId,
+          orderNo: index + 1,
+        })),
+      });
+      reloadDashboard();
+    } catch {
+      setRaidOrderIds(before);
+    } finally {
+      setRaidOrderSaving(false);
+    }
+  }
+
+  function handleRaidSortEnd(event: DragEndEvent) {
+    if (raidOrderSaving) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeRaidId = parseRaidIdFromSortableId(String(active.id));
+    const overRaidId = parseRaidIdFromSortableId(String(over.id));
+    if (activeRaidId == null || overRaidId == null) return;
+
+    const before =
+      raidOrderIds.length > 0 ? raidOrderIds : raidGroups.map((g) => g.raidId);
+    const oldIndex = before.indexOf(activeRaidId);
+    const newIndex = before.indexOf(overRaidId);
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+
+    const next = arrayMove(before, oldIndex, newIndex);
+    setRaidOrderIds(next);
+    void persistRaidOrder(next, before);
+  }
 
   const totalGold = useMemo(
     () => ({
@@ -622,11 +736,24 @@ export function ExpeditionCharacterCard({
             </div>
           ) : (
             <div className="mt-3 space-y-3">
-              {raidGroups.map((group, idx) => (
-                <div
-                  key={group.raidName}
-                  className={idx === 0 ? '' : 'border-t border-base-300 pt-3'}
+              <DndContext
+                sensors={dndSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleRaidSortEnd}
+              >
+                <SortableContext
+                  items={orderedRaidGroups.map((group) =>
+                    raidGroupSortableId(group.raidId)
+                  )}
+                  strategy={verticalListSortingStrategy}
                 >
+                  {orderedRaidGroups.map((group, idx) => (
+                    <SortableRaidGroup
+                      key={group.raidId}
+                      raidId={group.raidId}
+                      disabled={raidOrderSaving}
+                      className={idx === 0 ? '' : 'border-t border-base-300 pt-3'}
+                    >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -701,22 +828,24 @@ export function ExpeditionCharacterCard({
                       ))}
                     </div>
                   </div>
-                </div>
-              ))}
+                    </SortableRaidGroup>
+                  ))}
+                </SortableContext>
+              </DndContext>
 
               <div className="flex items-end justify-between border-t border-base-300 pt-2">
                 <span className="text-[clamp(13px,1vw,16px)] font-bold text-amber-300">
                   합계
                 </span>
                 <div className="inline-flex items-end gap-2 text-[clamp(12px,0.95vw,14px)] font-bold text-amber-300">
-                  <span>{totalGold.normal.toLocaleString()} G</span>
-                  <span className="text-base-content/60">/</span>
                   <span className="inline-flex flex-col items-start">
-                    <span className="badge badge-warning mb-0.5 h-4 min-h-4 rounded-full px-1 text-[8px] leading-none text-base-content">
+                    <span className="badge badge-warning mb-0.5 h-4 min-h-4 rounded-full px-1 text-[8px] leading-none text-black">
                       귀속
                     </span>
                     <span>{totalGold.bound.toLocaleString()} G</span>
                   </span>
+                  <span className="text-base-content/60">/</span>
+                  <span>{(totalGold.bound + totalGold.normal).toLocaleString()} G</span>
                 </div>
               </div>
             </div>
@@ -734,7 +863,6 @@ export function ExpeditionCharacterCard({
       <EditWeeklyRaidModal
         open={Boolean(editModalRaidId)}
         characterId={c.id}
-        allWeeklyRows={weeklyRaids}
         raidId={editModalRaidId}
         raidName={editModalRaidName}
         weeklyRows={editModalWeeklyRows}

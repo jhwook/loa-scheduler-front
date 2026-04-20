@@ -1,4 +1,10 @@
-import { getAccessToken } from "@/lib/auth/storage";
+import {
+  clearAuthStorage,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from "@/lib/auth/storage";
 import { ApiError } from "@/types/api";
 
 export function getApiBaseUrl(): string {
@@ -7,8 +13,8 @@ export function getApiBaseUrl(): string {
   return base.replace(/\/$/, "");
 }
 
-function getBaseUrl(): string {
-  return getApiBaseUrl();
+function normalizeApiPath(path: string): string {
+  return path.startsWith("/") ? path : `/${path}`;
 }
 
 type JsonBody = Record<string, unknown> | unknown[] | null;
@@ -25,17 +31,92 @@ export type RequestOptions = Omit<RequestInit, "body"> & {
   jsonString?: string;
 };
 
+/** 로그인·토큰 재발급 등 — 401 시 refresh 재시도하지 않음 */
+function isAuthExemptPath(path: string): boolean {
+  const p = normalizeApiPath(path);
+  return (
+    p === "/auth/login" ||
+    p === "/auth/signup" ||
+    p === "/auth/refresh"
+  );
+}
+
+let refreshInFlight: Promise<boolean> | null = null;
+
 /**
- * JSON API 공통 호출.
- * - Bearer 토큰은 자동 첨부 (로그인 등 토큰 없이 호출하는 경우 무시됨)
- * - 백엔드가 쿠키 세션만 쓰면 credentials: 'include' 와 쿠키 관련 헤더를 여기서 확장
+ * POST /auth/refresh — fetch 직접 사용(apiFetch와 순환·재귀 방지).
+ * 동시 401 시 한 번만 호출되도록 공유 Promise 사용.
  */
-export async function apiFetch<T>(
+export function refreshAuthSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const run = (async (): Promise<boolean> => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return false;
+
+    const url = `${getApiBaseUrl()}/auth/refresh`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      const contentType = res.headers.get("content-type") ?? "";
+      const isJson = contentType.includes("application/json");
+      const parsed = isJson
+        ? await res.json().catch(() => null)
+        : await res.text();
+
+      if (!res.ok) return false;
+      if (!parsed || typeof parsed !== "object") return false;
+
+      const o = parsed as Record<string, unknown>;
+      const access =
+        typeof o.accessToken === "string"
+          ? o.accessToken
+          : typeof o.token === "string"
+            ? o.token
+            : null;
+      const nextRefresh =
+        typeof o.refreshToken === "string"
+          ? o.refreshToken
+          : typeof o.refresh_token === "string"
+            ? o.refresh_token
+            : null;
+
+      if (!access || !nextRefresh) return false;
+      setAccessToken(access);
+      setRefreshToken(nextRefresh);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  refreshInFlight = run.finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+export function clearSessionAndRedirectToLogin(): void {
+  clearAuthStorage();
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname || "";
+  if (path === "/login" || path.startsWith("/login/")) return;
+  window.location.assign("/login");
+}
+
+async function executeJsonFetchOnce<T>(
   path: string,
-  options: RequestOptions = {},
+  options: RequestOptions,
 ): Promise<T> {
   const { json, jsonString, headers, ...rest } = options;
-  const url = `${getBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+  const url = `${getApiBaseUrl()}${normalizeApiPath(path)}`;
 
   const initHeaders = new Headers(headers);
   if (json !== undefined || jsonString !== undefined) {
@@ -86,4 +167,37 @@ export async function apiFetch<T>(
   }
 
   return parsed as T;
+}
+
+/**
+ * JSON API 공통 호출.
+ * - Bearer 토큰은 자동 첨부 (로그인 등 토큰 없이 호출하는 경우 무시됨)
+ * - 401 시 refresh 후 1회 재시도
+ */
+export async function apiFetch<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const exempt = isAuthExemptPath(path);
+
+  try {
+    return await executeJsonFetchOnce<T>(path, options);
+  } catch (err) {
+    if (
+      !(err instanceof ApiError) ||
+      err.status !== 401 ||
+      exempt ||
+      !getRefreshToken()
+    ) {
+      throw err;
+    }
+
+    const refreshed = await refreshAuthSession();
+    if (!refreshed) {
+      clearSessionAndRedirectToLogin();
+      throw err;
+    }
+
+    return await executeJsonFetchOnce<T>(path, options);
+  }
 }
