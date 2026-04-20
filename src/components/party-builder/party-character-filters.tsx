@@ -8,6 +8,8 @@ import { PartyCharacterPositionFilter } from '@/components/party-builder/party-c
 type Props = {
   position: PositionFilter;
   onPositionChange: (next: PositionFilter) => void;
+  onlyMine?: boolean;
+  onToggleMine?: () => void;
   minBound: number;
   maxBound: number;
   minValue: number;
@@ -20,6 +22,8 @@ type Props = {
 export function PartyCharacterFilters({
   position,
   onPositionChange,
+  onlyMine = false,
+  onToggleMine,
   minBound,
   maxBound,
   minValue,
@@ -40,7 +44,12 @@ export function PartyCharacterFilters({
           초기화
         </button>
       </div>
-      <PartyCharacterPositionFilter value={position} onChange={onPositionChange} />
+      <PartyCharacterPositionFilter
+        value={position}
+        onChange={onPositionChange}
+        onlyMine={onlyMine}
+        onToggleMine={onToggleMine}
+      />
       <PartyCharacterLevelFilter
         minBound={minBound}
         maxBound={maxBound}

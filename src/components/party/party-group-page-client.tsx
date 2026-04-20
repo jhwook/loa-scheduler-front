@@ -111,9 +111,7 @@ function partyTabCollisionDetection(args: Parameters<typeof closestCenter>[0]) {
   return hit.length > 0 ? hit : closestCenter(args);
 }
 
-function passWheelToOuterScroll(
-  e: ReactWheelEvent<HTMLDivElement>,
-): void {
+function passWheelToOuterScroll(e: ReactWheelEvent<HTMLDivElement>): void {
   const el = e.currentTarget;
   const { deltaY } = e;
   if (deltaY === 0) return;
@@ -265,6 +263,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
   >(null);
   const [selectedPosition, setSelectedPosition] =
     useState<PositionFilter>('ALL');
+  const [partyPoolOnlyMine, setPartyPoolOnlyMine] = useState(false);
   const [levelMinBound, setLevelMinBound] = useState(1640);
   const [levelMaxBound, setLevelMaxBound] = useState(1800);
   const [selectedMinLevel, setSelectedMinLevel] = useState(1640);
@@ -758,8 +757,20 @@ export function PartyGroupPageClient({ groupId }: Props) {
     [partyPoolOrderIds, rowById]
   );
 
+  const myCharacterIdsForPoolFilter = useMemo(() => {
+    if (!group || meUserId == null) return new Set<number>();
+    const me = group.members.find((m) => m.userId === meUserId);
+    return new Set((me?.characters ?? []).map((c) => c.id));
+  }, [group, meUserId]);
+
   const filteredPartyPoolRows = useMemo(() => {
     return orderedPartyPoolRows.filter((row) => {
+      if (
+        partyPoolOnlyMine &&
+        !myCharacterIdsForPoolFilter.has(row.character.id)
+      ) {
+        return false;
+      }
       if (
         selectedPosition !== 'ALL' &&
         normalizePartyRole(row.character.partyRole) !== selectedPosition
@@ -772,6 +783,8 @@ export function PartyGroupPageClient({ groupId }: Props) {
   }, [
     orderedPartyPoolRows,
     selectedPosition,
+    partyPoolOnlyMine,
+    myCharacterIdsForPoolFilter,
     selectedMinLevel,
     selectedMaxLevel,
   ]);
@@ -1517,12 +1530,13 @@ export function PartyGroupPageClient({ groupId }: Props) {
           >
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
               <section className="w-full min-w-0 shrink-0 lg:max-w-[24rem] xl:max-w-[26rem]">
-                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-base-content/50">
-                  공대 캐릭터
-                </h3>
                 <PartyCharacterFilters
                   position={selectedPosition}
                   onPositionChange={setSelectedPosition}
+                  onlyMine={partyPoolOnlyMine}
+                  onToggleMine={() =>
+                    setPartyPoolOnlyMine((prev) => !prev)
+                  }
                   minBound={levelMinBound}
                   maxBound={levelMaxBound}
                   minValue={selectedMinLevel}
@@ -1534,6 +1548,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
                   }}
                   onReset={() => {
                     setSelectedPosition('ALL');
+                    setPartyPoolOnlyMine(false);
                     setSelectedMinLevel(levelMinBound);
                     setSelectedMaxLevel(levelMaxBound);
                   }}
@@ -1684,7 +1699,9 @@ export function PartyGroupPageClient({ groupId }: Props) {
                         </div>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="badge badge-ghost text-xs">내 캐릭터</span>
+                        <span className="badge badge-ghost text-xs">
+                          내 캐릭터
+                        </span>
                         <button
                           type="button"
                           className={`btn btn-xs sm:btn-sm ${
@@ -1875,16 +1892,20 @@ export function PartyGroupPageClient({ groupId }: Props) {
                     draggable={false}
                     headerTrailing={
                       myCharacterIds.has(partyDndActiveRow.character.id) ||
-                      favoriteCharacterIds.has(partyDndActiveRow.character.id) ? (
+                      favoriteCharacterIds.has(
+                        partyDndActiveRow.character.id
+                      ) ? (
                         <span className="flex items-center gap-1">
                           {favoriteCharacterIds.has(
-                            partyDndActiveRow.character.id,
+                            partyDndActiveRow.character.id
                           ) ? (
                             <span className="text-xs leading-none text-warning">
                               ★
                             </span>
                           ) : null}
-                          {myCharacterIds.has(partyDndActiveRow.character.id) ? (
+                          {myCharacterIds.has(
+                            partyDndActiveRow.character.id
+                          ) ? (
                             <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
                               my
                             </span>
