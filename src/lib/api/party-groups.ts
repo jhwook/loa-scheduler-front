@@ -16,6 +16,10 @@ const PARTY_GROUP_MEMBER_NICKNAME_PATH = (groupId: number, memberId: number) =>
   `/party-groups/${groupId}/members/${memberId}/nickname`;
 const PARTY_GROUP_MY_CHARACTERS_PATH = (groupId: number) =>
   `/party-groups/${groupId}/my-characters`;
+const PARTY_GROUP_FAVORITES_PATH = (groupId: number) =>
+  `/party-groups/${groupId}/favorites`;
+const PARTY_GROUP_FAVORITE_PATH = (groupId: number, favoriteUserId: number) =>
+  `/party-groups/${groupId}/favorites/${favoriteUserId}`;
 
 type RawPartyGroup = {
   id?: number | string;
@@ -308,6 +312,57 @@ export async function putPartyGroupMyCharacters(
   return apiFetch<unknown>(PARTY_GROUP_MY_CHARACTERS_PATH(groupId), {
     method: "PUT",
     json: { characterIds },
+  });
+}
+
+function extractFavoriteUserId(row: unknown): number | null {
+  if (typeof row === "number" && Number.isFinite(row)) return row;
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  const id =
+    toNumber(r.favoriteUserId) ??
+    toNumber(r.favorite_user_id) ??
+    toNumber(r.userId) ??
+    toNumber(r.user_id) ??
+    toNumber(r.id);
+  return id ?? null;
+}
+
+/** GET /party-groups/:groupId/favorites */
+export async function getPartyGroupFavorites(groupId: number): Promise<number[]> {
+  const raw = await apiFetch<unknown>(PARTY_GROUP_FAVORITES_PATH(groupId), {
+    method: "GET",
+  });
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object"
+      ? ((raw as { favorites?: unknown[]; data?: unknown[] }).favorites ??
+        (raw as { favorites?: unknown[]; data?: unknown[] }).data ??
+        [])
+      : [];
+  return list
+    .map(extractFavoriteUserId)
+    .filter((id): id is number => typeof id === "number" && id > 0);
+}
+
+/** POST /party-groups/:groupId/favorites */
+export async function addPartyGroupFavorite(
+  groupId: number,
+  favoriteUserId: number,
+): Promise<void> {
+  await apiFetch<unknown>(PARTY_GROUP_FAVORITES_PATH(groupId), {
+    method: "POST",
+    json: { favoriteUserId },
+  });
+}
+
+/** DELETE /party-groups/:groupId/favorites/:favoriteUserId */
+export async function removePartyGroupFavorite(
+  groupId: number,
+  favoriteUserId: number,
+): Promise<void> {
+  await apiFetch<unknown>(PARTY_GROUP_FAVORITE_PATH(groupId, favoriteUserId), {
+    method: "DELETE",
   });
 }
 

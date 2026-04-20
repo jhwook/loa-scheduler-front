@@ -2,9 +2,17 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import { createRaidParty, getRaidInfoOptions } from "@/lib/api/raid-party";
+import {
+  createRaidParty,
+  getRaidInfoOptions,
+  getRaidPartyDifficultyOptions,
+} from "@/lib/api/raid-party";
 import { ApiError } from "@/types/api";
-import type { RaidInfoOption, RaidParty } from "@/types/raid-party";
+import type {
+  RaidInfoOption,
+  RaidParty,
+  RaidPartyDifficultyOption,
+} from "@/types/raid-party";
 
 type Props = {
   open: boolean;
@@ -23,6 +31,12 @@ export function CreateRaidPartyModal({
   const [raidsLoading, setRaidsLoading] = useState(false);
   const [raidsError, setRaidsError] = useState<string | null>(null);
   const [selectedRaidInfoId, setSelectedRaidInfoId] = useState<number | "">("");
+  const [difficultyOptions, setDifficultyOptions] = useState<
+    RaidPartyDifficultyOption[]
+  >([]);
+  const [difficultyLoading, setDifficultyLoading] = useState(false);
+  const [difficultyError, setDifficultyError] = useState<string | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("");
   const [partyTitle, setPartyTitle] = useState("");
   const [isCreatingRaidParty, setIsCreatingRaidParty] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -53,8 +67,50 @@ export function CreateRaidPartyModal({
     if (!open) return;
     setSubmitError(null);
     setPartyTitle("");
+    setDifficultyOptions([]);
+    setDifficultyError(null);
+    setSelectedDifficulty("");
     void loadRaids();
   }, [open, loadRaids]);
+
+  useEffect(() => {
+    if (!open || selectedRaidInfoId === "") {
+      setDifficultyOptions([]);
+      setDifficultyError(null);
+      setSelectedDifficulty("");
+      return;
+    }
+    let cancelled = false;
+    setDifficultyLoading(true);
+    setDifficultyError(null);
+    setDifficultyOptions([]);
+    setSelectedDifficulty("");
+    void getRaidPartyDifficultyOptions(groupId, Number(selectedRaidInfoId))
+      .then((rows) => {
+        if (cancelled) return;
+        setDifficultyOptions(rows);
+        setSelectedDifficulty(rows[0]?.value ?? "");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "난이도 목록을 불러오지 못했습니다.";
+        setDifficultyError(msg);
+        setDifficultyOptions([]);
+        setSelectedDifficulty("");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setDifficultyLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, open, selectedRaidInfoId]);
 
   if (!open) return null;
 
@@ -71,6 +127,7 @@ export function CreateRaidPartyModal({
         groupId,
         raidInfoId: Number(selectedRaidInfoId),
         title: partyTitle.trim() || undefined,
+        selectedDifficulty: selectedDifficulty || undefined,
       });
       onCreated(created);
       onClose();
@@ -135,6 +192,38 @@ export function CreateRaidPartyModal({
 
           <label className="form-control w-full gap-1">
             <span className="label-text text-xs font-medium text-base-content/70">
+              난이도
+            </span>
+            {difficultyLoading ? (
+              <div className="flex h-9 items-center gap-2 text-sm text-base-content/60">
+                <span className="loading loading-spinner loading-sm" />
+                불러오는 중…
+              </div>
+            ) : difficultyError ? (
+              <p className="text-sm text-error">{difficultyError}</p>
+            ) : (
+              <select
+                className="select select-bordered select-sm w-full border-base-300 bg-base-300 text-base-content"
+                value={selectedDifficulty}
+                onChange={(e) => setSelectedDifficulty(e.target.value)}
+                disabled={isCreatingRaidParty || difficultyOptions.length === 0}
+                aria-label="난이도 선택"
+              >
+                {difficultyOptions.length === 0 ? (
+                  <option value="">난이도 없음</option>
+                ) : (
+                  difficultyOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            )}
+          </label>
+
+          <label className="form-control w-full gap-1">
+            <span className="label-text text-xs font-medium text-base-content/70">
               제목 (선택)
             </span>
             <input
@@ -172,7 +261,8 @@ export function CreateRaidPartyModal({
                 raidsLoading ||
                 Boolean(raidsError) ||
                 raidOptions.length === 0 ||
-                selectedRaidInfoId === ""
+                selectedRaidInfoId === "" ||
+                difficultyLoading
               }
             >
               {isCreatingRaidParty ? (

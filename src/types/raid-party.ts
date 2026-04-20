@@ -21,6 +21,7 @@ export type RaidParty = {
   groupId: number;
   raidInfoId: number;
   title: string | null;
+  selectedDifficulty?: string | null;
   partySize: number;
   status: RaidPartyStatus;
   createdByUserId: number;
@@ -32,13 +33,27 @@ export type CreateRaidPartyRequest = {
   raidInfoId: number;
   /** 비우면 요청에서 생략 */
   title?: string;
+  /** 선택한 난이도 (예: 3단계, 하드, 노말) */
+  selectedDifficulty?: string;
+};
+
+export type UpdateRaidPartyRequest = {
+  title?: string | null;
+  selectedDifficulty?: string | null;
+};
+
+export type RaidPartyDifficultyOption = {
+  label: string;
+  value: string;
 };
 
 /** GET /raid-parties/group/:groupId 목록 행 */
 export type RaidPartyListItem = {
   id: number;
+  raidInfoId: number;
   title: string | null;
   raidName: string;
+  selectedDifficulty?: string | null;
   partySize: number;
   createdByUserId: number;
   createdByUsername?: string | null;
@@ -51,6 +66,8 @@ export type RaidPartyListItem = {
 export type RaidPartySlotCharacter = {
   id: number;
   characterName: string;
+  /** 공격대 내 별명 (memberNickname/groupNickname 계열) */
+  groupNickname?: string | null;
   /** 캐릭터 소유자 표시명 (API `ownerDisplayName`) */
   ownerDisplayName?: string | null;
   partyRole?: "DEALER" | "SUPPORT" | string | null;

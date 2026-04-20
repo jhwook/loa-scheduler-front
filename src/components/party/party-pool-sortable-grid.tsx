@@ -18,9 +18,10 @@ export type PartyPoolRenderableSection = {
 
 type SortablePoolCardProps = {
   row: PartyPoolOrderedRow;
+  isMine: boolean;
 };
 
-function SortablePoolCard({ row }: SortablePoolCardProps) {
+function SortablePoolCard({ row, isMine }: SortablePoolCardProps) {
   const sortableId = poolCharDndId(row.character.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: sortableId });
@@ -39,6 +40,13 @@ function SortablePoolCard({ row }: SortablePoolCardProps) {
           memberNickname={row.ownerDisplayName}
           character={row.character}
           draggable={false}
+          headerTrailing={
+            isMine ? (
+              <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
+                my
+              </span>
+            ) : undefined
+          }
         />
       </div>
     </div>
@@ -48,9 +56,10 @@ function SortablePoolCard({ row }: SortablePoolCardProps) {
 type Props = {
   rows: readonly PartyPoolOrderedRow[];
   sections: readonly PartyPoolRenderableSection[];
+  myCharacterIds?: ReadonlySet<number>;
 };
 
-export function PartyPoolSortableGrid({ rows, sections }: Props) {
+export function PartyPoolSortableGrid({ rows, sections, myCharacterIds }: Props) {
   const rowsById = useMemo(
     () => new Map(rows.map((row) => [row.character.id, row] as const)),
     [rows],
@@ -68,7 +77,13 @@ export function PartyPoolSortableGrid({ rows, sections }: Props) {
               {section.ids.map((id) => {
                 const row = rowsById.get(id);
                 if (!row) return null;
-                return <SortablePoolCard key={id} row={row} />;
+                return (
+                  <SortablePoolCard
+                    key={id}
+                    row={row}
+                    isMine={Boolean(myCharacterIds?.has(row.character.id))}
+                  />
+                );
               })}
             </div>
           </section>

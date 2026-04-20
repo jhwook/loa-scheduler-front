@@ -22,6 +22,7 @@ export type RaidPartySlotCell = {
 type Props = {
   label: string;
   cells: RaidPartySlotCell[];
+  myCharacterIds?: ReadonlySet<number>;
   raidPartyId?: number;
   useDndKitDrop?: boolean;
   onDropCharacter?: (slotIndex: number, characterId: number) => void | Promise<void>;
@@ -32,6 +33,8 @@ type Props = {
 };
 
 function slotOwnerHeaderLabel(c: RaidPartySlotCharacter): string {
+  const g = c.groupNickname?.trim();
+  if (g) return g;
   const t = c.ownerDisplayName?.trim();
   return t ? t : "별명 없음";
 }
@@ -78,12 +81,14 @@ function DraggablePlacedCard({
   raidPartyId,
   memberId,
   character,
+  isMine,
   disabled,
   onRemove,
 }: {
   raidPartyId: number;
   memberId: number;
   character: RaidPartySlotCharacter;
+  isMine: boolean;
   disabled: boolean;
   onRemove?: () => void;
 }) {
@@ -123,9 +128,16 @@ function DraggablePlacedCard({
           draggable={false}
           className="w-full"
           headerTrailing={
-            onRemove ? (
-              <RemovePlacedButton onRemove={onRemove} disabled={disabled} />
-            ) : undefined
+            <span className="flex items-center gap-1">
+              {isMine ? (
+                <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
+                  my
+                </span>
+              ) : null}
+              {onRemove ? (
+                <RemovePlacedButton onRemove={onRemove} disabled={disabled} />
+              ) : null}
+            </span>
           }
         />
       </div>
@@ -170,12 +182,14 @@ function SlotBody({
   cell,
   raidPartyId,
   enablePlacedReorder,
+  myCharacterIds,
   onRemovePlacedMember,
   dropBusy,
 }: {
   cell: RaidPartySlotCell;
   raidPartyId: number;
   enablePlacedReorder: boolean;
+  myCharacterIds?: ReadonlySet<number>;
   onRemovePlacedMember?: (memberId: number) => void | Promise<void>;
   dropBusy: boolean;
 }) {
@@ -187,6 +201,7 @@ function SlotBody({
     memberId != null && onRemovePlacedMember
       ? () => void onRemovePlacedMember(memberId)
       : undefined;
+  const isMine = c ? Boolean(myCharacterIds?.has(c.id)) : false;
 
   return (
     <div className="flex w-full min-w-0 flex-col">
@@ -196,6 +211,7 @@ function SlotBody({
             raidPartyId={raidPartyId}
             memberId={memberId}
             character={c}
+            isMine={isMine}
             disabled={dropBusy}
             onRemove={removeHandler}
           />
@@ -213,12 +229,19 @@ function SlotBody({
             draggable={false}
             className="w-full"
             headerTrailing={
-              removeHandler ? (
-                <RemovePlacedButton
-                  onRemove={removeHandler}
-                  disabled={dropBusy}
-                />
-              ) : undefined
+              <span className="flex items-center gap-1">
+                {isMine ? (
+                  <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
+                    my
+                  </span>
+                ) : null}
+                {removeHandler ? (
+                  <RemovePlacedButton
+                    onRemove={removeHandler}
+                    disabled={dropBusy}
+                  />
+                ) : null}
+              </span>
             }
           />
         )
@@ -236,6 +259,7 @@ function DndKitSlotCell({
   cell,
   disabled,
   enablePlacedReorder,
+  myCharacterIds,
   onRemovePlacedMember,
 }: {
   raidPartyId: number;
@@ -244,6 +268,7 @@ function DndKitSlotCell({
   cell: RaidPartySlotCell;
   disabled: boolean;
   enablePlacedReorder: boolean;
+  myCharacterIds?: ReadonlySet<number>;
   onRemovePlacedMember?: (memberId: number) => void | Promise<void>;
 }) {
   const id = raidSlotDndId(raidPartyId, slotIndex);
@@ -273,6 +298,7 @@ function DndKitSlotCell({
         cell={cell}
         raidPartyId={raidPartyId}
         enablePlacedReorder={enablePlacedReorder}
+        myCharacterIds={myCharacterIds}
         onRemovePlacedMember={onRemovePlacedMember}
         dropBusy={disabled}
       />
@@ -288,6 +314,7 @@ function Html5SlotCell({
   onDropCharacter,
   raidPartyId,
   enablePlacedReorder,
+  myCharacterIds,
   onRemovePlacedMember,
   dropBusy,
 }: {
@@ -298,6 +325,7 @@ function Html5SlotCell({
   onDropCharacter: (slotIndex: number, characterId: number) => void | Promise<void>;
   raidPartyId: number;
   enablePlacedReorder: boolean;
+  myCharacterIds?: ReadonlySet<number>;
   onRemovePlacedMember?: (memberId: number) => void | Promise<void>;
   dropBusy: boolean;
 }) {
@@ -362,6 +390,7 @@ function Html5SlotCell({
         cell={cell}
         raidPartyId={raidPartyId}
         enablePlacedReorder={enablePlacedReorder}
+        myCharacterIds={myCharacterIds}
         onRemovePlacedMember={onRemovePlacedMember}
         dropBusy={dropBusy}
       />
@@ -372,6 +401,7 @@ function Html5SlotCell({
 export function RaidPartySlotGrid({
   label,
   cells,
+  myCharacterIds,
   raidPartyId,
   useDndKitDrop = false,
   onDropCharacter,
@@ -415,6 +445,7 @@ export function RaidPartySlotGrid({
                 cell={cell}
                 disabled={dropBusy}
                 enablePlacedReorder={placedReorderEnabled}
+                myCharacterIds={myCharacterIds}
                 onRemovePlacedMember={onRemovePlacedMember}
               />
             );
@@ -430,6 +461,7 @@ export function RaidPartySlotGrid({
                 onDropCharacter={onDropCharacter}
                 raidPartyId={rid}
                 enablePlacedReorder={placedReorderEnabled}
+                myCharacterIds={myCharacterIds}
                 onRemovePlacedMember={onRemovePlacedMember}
                 dropBusy={dropBusy}
               />
@@ -449,6 +481,7 @@ export function RaidPartySlotGrid({
                 cell={cell}
                 raidPartyId={rid}
                 enablePlacedReorder={placedReorderEnabled}
+                myCharacterIds={myCharacterIds}
                 onRemovePlacedMember={onRemovePlacedMember}
                 dropBusy={dropBusy}
               />

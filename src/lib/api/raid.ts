@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
+  PatchAdminRaidOrderRequest,
   CharacterWeeklyRaidItem,
   CreateCharacterWeeklyRaidsRequest,
   CreateRaidGateRequest,
@@ -18,6 +19,7 @@ import type {
 
 const ADMIN_RAIDS_PATH = "/raid-info/admin/raids";
 const ADMIN_GATES_PATH = "/raid-info/admin/gates";
+const ADMIN_RAID_ORDER_PATH = "/raid-info/admin/order";
 
 type RaidListResponse =
   | unknown[]
@@ -94,6 +96,15 @@ export async function updateRaid(
 export async function deleteRaid(raidId: number): Promise<void> {
   await apiFetch<unknown>(`${ADMIN_RAIDS_PATH}/${raidId}`, {
     method: "DELETE",
+  });
+}
+
+export async function patchAdminRaidOrder(
+  payload: PatchAdminRaidOrderRequest,
+): Promise<void> {
+  await apiFetch<unknown>(ADMIN_RAID_ORDER_PATH, {
+    method: "PATCH",
+    json: payload,
   });
 }
 

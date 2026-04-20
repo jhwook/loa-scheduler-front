@@ -20,6 +20,10 @@ export type PartyGroupMember = {
   nickname?: string | null;
   displayName: string;
   role?: "OWNER" | "MEMBER" | string;
+  /** 현재 로그인 사용자 기준 즐겨찾기 여부 */
+  isFavorite?: boolean;
+  /** 현재 로그인 사용자 본인 여부 */
+  isMe?: boolean;
 };
 
 /** 공대원 현황 카드에 표시할 주간 레이드 숙제 (레이드명·관문만, 더보기 골드 등은 제외) */

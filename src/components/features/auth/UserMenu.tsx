@@ -458,15 +458,15 @@ export function UserMenu() {
 
       {invitesOpen && mounted
         ? createPortal(
-            <div className="fixed inset-0 z-10000 grid place-items-center bg-slate-950/45 p-4">
-              <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-slate-900">
+            <div className="fixed inset-0 z-10000 grid place-items-center bg-base-100/70 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-2xl rounded-2xl border border-base-300 bg-base-200 p-5 shadow-2xl">
+                <div className="mb-3 flex items-center justify-between border-b border-base-300 pb-3">
+                  <h3 className="text-base font-semibold text-base-content">
                     받은 초대
                   </h3>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm text-slate-900"
+                    className="btn btn-ghost btn-sm text-base-content/85 hover:bg-base-300"
                     onClick={() => setInvitesOpen(false)}
                   >
                     닫기
@@ -474,15 +474,29 @@ export function UserMenu() {
                 </div>
 
                 {invitesLoading ? (
-                  <p className="py-8 text-center text-sm text-slate-500">
-                    불러오는 중…
-                  </p>
+                  <div className="space-y-3 py-2">
+                    {Array.from({ length: 2 }).map((_, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-xl border border-base-300 bg-base-300/50 p-4"
+                      >
+                        <div className="skeleton h-4 w-36 rounded-md" />
+                        <div className="mt-2 skeleton h-3 w-28 rounded-md" />
+                        <div className="mt-3 skeleton h-3 w-2/3 rounded-md" />
+                        <div className="mt-2 skeleton h-3 w-44 rounded-md" />
+                        <div className="mt-3 flex justify-end gap-2">
+                          <div className="skeleton h-8 w-14 rounded-lg" />
+                          <div className="skeleton h-8 w-14 rounded-lg" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : invitesError ? (
-                  <div className="rounded-lg bg-rose-50 px-3 py-3 text-sm text-rose-700">
+                  <div className="rounded-lg border border-rose-900/40 bg-rose-950/20 px-3 py-3 text-sm text-rose-100">
                     {invitesError}
                   </div>
                 ) : invites.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-slate-500">
+                  <p className="py-8 text-center text-sm text-base-content/60">
                     받은 초대가 없습니다.
                   </p>
                 ) : (
@@ -490,18 +504,18 @@ export function UserMenu() {
                     {invites.map((inv) => (
                       <div
                         key={inv.id}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                        className="rounded-xl border border-base-300 bg-base-300/45 px-4 py-3"
                       >
-                        <div className="text-sm font-semibold text-slate-900">
+                        <div className="text-sm font-semibold text-base-content">
                           {inv.groupName}
                         </div>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-base-content/65">
                           초대한 사람: {inv.inviterName}
                         </p>
-                        <p className="mt-1 text-sm text-slate-700">
+                        <p className="mt-1 text-sm text-base-content/90">
                           {inv.message?.trim() ? inv.message : '메시지 없음'}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-base-content/65">
                           생성일:{' '}
                           {inv.createdAt
                             ? new Date(inv.createdAt).toLocaleString()
@@ -510,7 +524,7 @@ export function UserMenu() {
                         <div className="mt-3 flex justify-end gap-2">
                           <button
                             type="button"
-                            className="btn btn-sm btn-outline border-rose-300 text-rose-700"
+                            className="btn btn-sm border-rose-500/45 bg-rose-950/20 text-rose-200 hover:border-rose-400/60 hover:bg-rose-900/35"
                             disabled={inviteActingId === inv.id}
                             onClick={() =>
                               void onHandleInvite(inv.id, 'reject')
@@ -520,7 +534,7 @@ export function UserMenu() {
                           </button>
                           <button
                             type="button"
-                            className="btn btn-sm btn-primary text-slate-950"
+                            className="btn btn-sm border-emerald-500/60 bg-emerald-900/45 text-emerald-100 hover:border-emerald-400/75 hover:bg-emerald-800/55"
                             disabled={inviteActingId === inv.id}
                             onClick={() =>
                               void onHandleInvite(inv.id, 'accept')

@@ -428,26 +428,52 @@ export function ExpeditionCharacterCard({
     return () => window.clearInterval(timer);
   }, [targetCurrentClearGold]);
 
-  async function toggleClear(weeklyRaidId: number) {
+  async function toggleClear(targetRow: CharacterWeeklyRaidItem) {
+    const weeklyRaidId = targetRow.id;
     if (pendingClearIds.has(weeklyRaidId)) return;
     const target = weeklyRaids.find((row) => row.id === weeklyRaidId);
     if (!target) return;
     const nextIsCleared = !target.isCleared;
-    setPendingClearIds((prev) => new Set(prev).add(weeklyRaidId));
+
+    const targetRaidInfoId = target.raidGateInfo.raidInfo.id;
+    const targetDifficulty = target.raidGateInfo.difficulty;
+    const targetGate = target.raidGateInfo.gateNumber;
+
+    const affectedIds = weeklyRaids
+      .filter(
+        (row) =>
+          row.raidGateInfo.raidInfo.id === targetRaidInfoId &&
+          row.raidGateInfo.difficulty === targetDifficulty &&
+          (nextIsCleared
+            ? row.raidGateInfo.gateNumber <= targetGate
+            : row.raidGateInfo.gateNumber >= targetGate)
+      )
+      .map((row) => row.id);
+    if (affectedIds.length === 0) return;
+
+    setPendingClearIds((prev) => {
+      const next = new Set(prev);
+      for (const id of affectedIds) next.add(id);
+      return next;
+    });
     const prevRows = weeklyRaids;
     setWeeklyRaids((prev) =>
       prev.map((row) =>
-        row.id === weeklyRaidId ? { ...row, isCleared: !row.isCleared } : row
+        affectedIds.includes(row.id)
+          ? { ...row, isCleared: nextIsCleared }
+          : row
       )
     );
     try {
-      await patchCharacterWeeklyRaidClear(weeklyRaidId, nextIsCleared);
+      await Promise.all(
+        affectedIds.map((id) => patchCharacterWeeklyRaidClear(id, nextIsCleared))
+      );
     } catch {
       setWeeklyRaids(prevRows);
     } finally {
       setPendingClearIds((prev) => {
         const next = new Set(prev);
-        next.delete(weeklyRaidId);
+        for (const id of affectedIds) next.delete(id);
         return next;
       });
     }
@@ -813,7 +839,7 @@ export function ExpeditionCharacterCard({
                                 ? 'border-emerald-500 bg-emerald-900/40 text-emerald-200'
                                 : 'border-base-300 bg-base-300 text-base-content'
                             } ${pendingClearIds.has(row.id) ? 'opacity-60' : ''}`}
-                            onClick={() => toggleClear(row.id)}
+                            onClick={() => void toggleClear(row)}
                             disabled={pendingClearIds.has(row.id)}
                             aria-label={`${group.raidName} ${row.raidGateInfo.gateNumber}관문 클리어 토글`}
                           >

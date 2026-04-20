@@ -3,6 +3,7 @@ import type {
   CreateRaidPartyRequest,
   DeleteRaidPartyResult,
   RaidInfoOption,
+  RaidPartyDifficultyOption,
   RaidParty,
   RaidPartyDetail,
   RaidPartyListItem,
@@ -10,6 +11,7 @@ import type {
   RaidPartyRaidInfoRef,
   RaidPartySlotCharacter,
   RaidPartyStatus,
+  UpdateRaidPartyRequest,
 } from "@/types/raid-party";
 
 const RAID_INFO_PATH = "/raid-info";
@@ -64,6 +66,9 @@ function mapRaidPartyFromApi(row: unknown): RaidParty {
     groupId: Number(r.groupId ?? r.group_id),
     raidInfoId: Number(r.raidInfoId ?? r.raid_info_id),
     title: r.title === undefined || r.title === null ? null : String(r.title),
+    selectedDifficulty: optionalTrimmedString(
+      r.selectedDifficulty ?? r.selected_difficulty,
+    ),
     partySize: normalizePartySize(r.partySize ?? r.party_size),
     status: parseStatus(r.status),
     createdByUserId: Number(r.createdByUserId ?? r.created_by_user_id),
@@ -115,8 +120,12 @@ function mapRaidPartyListItemFromApi(row: unknown): RaidPartyListItem {
 
   return {
     id: Number(r.id),
+    raidInfoId: Number(r.raidInfoId ?? r.raid_info_id ?? 0),
     title: r.title === undefined || r.title === null ? null : String(r.title),
     raidName,
+    selectedDifficulty: optionalTrimmedString(
+      r.selectedDifficulty ?? r.selected_difficulty,
+    ),
     partySize: normalizePartySize(r.partySize ?? r.party_size),
     createdByUserId: Number(r.createdByUserId ?? r.created_by_user_id),
     createdByUsername,
@@ -205,20 +214,49 @@ function ownerDisplayNameFromNestedUser(row: Record<string, unknown>): string | 
   return null;
 }
 
-/** 캐릭터/배치 행에서 소유자 표시명 (우선 `ownerDisplayName`) */
+function groupNicknameFromNestedMember(row: Record<string, unknown>): string | null {
+  const nested =
+    row.partyGroupMember ??
+    row.party_group_member ??
+    row.member ??
+    row.Member ??
+    row.assignedMember ??
+    row.assigned_member;
+  if (nested !== null && typeof nested === "object") {
+    const m = asRecord(nested);
+    return optionalTrimmedString(
+      m.groupNickname ??
+        m.group_nickname ??
+        m.memberNickname ??
+        m.member_nickname ??
+        m.nickname ??
+        m.displayName ??
+        m.display_name,
+    );
+  }
+  return null;
+}
+
+/** 캐릭터/배치 행에서 공격대 별명(우선) */
+function resolveGroupNicknameFromRecord(r: Record<string, unknown>): string | null {
+  const direct = optionalTrimmedString(
+    r.groupNickname ??
+      r.group_nickname ??
+      r.memberNickname ??
+      r.member_nickname,
+  );
+  if (direct) return direct;
+  return groupNicknameFromNestedMember(r);
+}
+
+/** 캐릭터/배치 행에서 소유자 표시명 */
 function resolveOwnerDisplayNameFromRecord(r: Record<string, unknown>): string | null {
   const primary = optionalTrimmedString(
     r.ownerDisplayName ?? r.owner_display_name,
   );
   if (primary) return primary;
 
-  const legacy = optionalTrimmedString(
-    r.memberNickname ??
-      r.member_nickname ??
-      r.ownerNickname ??
-      r.owner_nickname ??
-      r.nickname,
-  );
+  const legacy = optionalTrimmedString(r.ownerNickname ?? r.owner_nickname ?? r.nickname);
   if (legacy) return legacy;
 
   return ownerDisplayNameFromNestedUser(r);
@@ -231,6 +269,7 @@ function mapSlotCharacterFromApi(row: unknown): RaidPartySlotCharacter {
     characterName: String(
       c.characterName ?? c.character_name ?? c.name ?? "",
     ),
+    groupNickname: resolveGroupNicknameFromRecord(c),
     ownerDisplayName: resolveOwnerDisplayNameFromRecord(c),
     partyRole:
       c.partyRole !== undefined && c.partyRole !== null
@@ -313,6 +352,12 @@ function mapRaidPartyMemberFromApi(row: unknown): RaidPartyMemberAssignment | nu
       character = { ...character, ownerDisplayName: fromRow };
     }
   }
+  if (!optionalTrimmedString(character.groupNickname ?? undefined)) {
+    const fromRow = resolveGroupNicknameFromRecord(m);
+    if (fromRow) {
+      character = { ...character, groupNickname: fromRow };
+    }
+  }
 
   return {
     memberId,
@@ -363,12 +408,58 @@ export async function createRaidParty(
   };
   const t = payload.title?.trim();
   if (t) body.title = t;
+  const d = payload.selectedDifficulty?.trim();
+  if (d) body.selectedDifficulty = d;
 
   const data = await apiFetch<unknown>(RAID_PARTIES_PATH, {
     method: "POST",
     json: body,
   });
   return mapRaidPartyFromApi(data);
+}
+
+export async function patchRaidParty(
+  raidPartyId: number,
+  payload: UpdateRaidPartyRequest,
+): Promise<RaidParty> {
+  const body: Record<string, unknown> = {};
+  if (payload.title !== undefined) {
+    const t = payload.title?.trim();
+    body.title = t ? t : null;
+  }
+  if (payload.selectedDifficulty !== undefined) {
+    const d = payload.selectedDifficulty?.trim();
+    body.selectedDifficulty = d ? d : null;
+  }
+  const data = await apiFetch<unknown>(`${RAID_PARTIES_PATH}/${raidPartyId}`, {
+    method: "PATCH",
+    json: body,
+  });
+  return mapRaidPartyFromApi(data);
+}
+
+/** GET /raid-parties/group/:groupId/raid-info/:raidInfoId/difficulties */
+export async function getRaidPartyDifficultyOptions(
+  groupId: number,
+  raidInfoId: number,
+): Promise<RaidPartyDifficultyOption[]> {
+  const raw = await apiFetch<unknown>(
+    `${RAID_PARTIES_PATH}/group/${groupId}/raid-info/${raidInfoId}/difficulties`,
+    { method: "GET" },
+  );
+  const list = Array.isArray(raw) ? raw : [];
+  return list
+    .map((row) => {
+      const r = asRecord(row);
+      const label = optionalTrimmedString(r.label);
+      const value = optionalTrimmedString(r.value);
+      if (!value) return null;
+      return {
+        label: label ?? value,
+        value,
+      } satisfies RaidPartyDifficultyOption;
+    })
+    .filter((x): x is RaidPartyDifficultyOption => Boolean(x));
 }
 
 /** GET /raid-parties/group/:groupId */

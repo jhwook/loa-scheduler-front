@@ -45,6 +45,9 @@ export function RaidPartyListPanel({
               const selected = selectedId === p.id;
               const title =
                 p.title?.trim() || p.raidName || `파티 #${p.id}`;
+              const titleWithDifficulty = p.selectedDifficulty?.trim()
+                ? `${title} (${p.selectedDifficulty.trim()})`
+                : title;
               const creator =
                 p.createdByUsername?.trim() ||
                 `회원 #${p.createdByUserId}`;
@@ -60,7 +63,7 @@ export function RaidPartyListPanel({
                     }`}
                   >
                     <p className="line-clamp-2 font-semibold leading-snug">
-                      {title}
+                      {titleWithDifficulty}
                     </p>
                     <p className="mt-1 truncate text-[10px] text-base-content/55">
                       {p.raidName}

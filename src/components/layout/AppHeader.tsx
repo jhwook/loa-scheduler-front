@@ -110,7 +110,7 @@ export function AppHeader() {
 
   if (authPage) {
     return (
-      <header className="sticky top-0 z-40 border-b border-base-300 bg-base-200/95 backdrop-blur">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-base-300 bg-base-200/95 backdrop-blur">
         <div className="flex h-14 items-center justify-between px-4 md:px-8">
           <Link
             href="/dashboard"
@@ -134,7 +134,7 @@ export function AppHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-base-300 bg-base-200/95 backdrop-blur supports-[backdrop-filter]:bg-base-200/85">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-base-300 bg-base-200/95 backdrop-blur supports-[backdrop-filter]:bg-base-200/85">
       <div className="navbar min-h-16 gap-2 px-2 sm:px-4">
         <div className="navbar-start min-w-0 flex-1 gap-1">
           <div className="dropdown dropdown-end lg:hidden">

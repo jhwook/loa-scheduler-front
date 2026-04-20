@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { SupporterRoleMark } from '@/components/ui/supporter-role-mark';
 import { getClassIconSrc, resolveClassIconBasename } from '@/lib/class-icon';
@@ -11,6 +11,9 @@ import type {
 
 type Props = {
   member: PartyGroupMemberWithRoster;
+  isMine?: boolean;
+  favoriteBusy?: boolean;
+  onToggleFavorite?: (member: PartyGroupMemberWithRoster) => void | Promise<void>;
 };
 
 function parseNumberLike(value: unknown): number | null {
@@ -68,11 +71,7 @@ function CharacterCard({
   );
   const classIconSrc = iconBasename ? getClassIconSrc(iconBasename) : null;
 
-  const homework = c.weeklyRaids ?? [];
-
-  useEffect(() => {
-    setClassIconFailed(false);
-  }, [classIconSrc]);
+  const homework = useMemo(() => c.weeklyRaids ?? [], [c.weeklyRaids]);
 
   const lvCombat = (
     <span className="shrink-0 whitespace-nowrap text-[13px] tabular-nums">
@@ -133,13 +132,14 @@ function CharacterCard({
   }, [homework]);
 
   return (
-    <div className="flex min-h-0 flex-col rounded-xl border border-base-300 bg-base-200/50">
-      <div className="flex items-start gap-2.5 border-b border-base-300 px-2.5 py-2.5 sm:px-3">
+    <div className="flex min-h-0 min-w-[252px] flex-col rounded-xl border border-base-content/20 bg-base-200/50">
+      <div className="flex items-start gap-2.5 border-b border-base-content/15 px-2.5 py-2.5 sm:px-3">
         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-visible rounded-full border border-base-300 bg-base-300 text-[11px] font-bold text-base-content sm:h-10 sm:w-10 sm:text-[12px]">
           <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full">
             {classIconSrc && !classIconFailed ? (
               // eslint-disable-next-line @next/next/no-img-element -- public 직업 아이콘
               <img
+                key={classIconSrc}
                 src={classIconSrc}
                 alt=""
                 className="h-full w-full object-cover brightness-0 invert"
@@ -231,7 +231,31 @@ function CharacterCard({
   );
 }
 
-export function PartyMemberCard({ member }: Props) {
+function FavoriteStarIcon({ active }: { active: boolean }) {
+  if (active) {
+    return (
+      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+        <path d="M12 2.25l2.93 5.93 6.55.95-4.74 4.62 1.12 6.52L12 17.77l-5.86 3.08 1.12-6.52-4.74-4.62 6.55-.95L12 2.25z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 stroke-current fill-none" aria-hidden="true">
+      <path
+        d="M12 2.25l2.93 5.93 6.55.95-4.74 4.62 1.12 6.52L12 17.77l-5.86 3.08 1.12-6.52-4.74-4.62 6.55-.95L12 2.25z"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function PartyMemberCard({
+  member,
+  isMine = false,
+  favoriteBusy = false,
+  onToggleFavorite,
+}: Props) {
   const sortedCharacters = useMemo(() => {
     const list = [...member.characters];
     // itemAvgLevel 높은 순(내림차순) 정렬
@@ -247,11 +271,39 @@ export function PartyMemberCard({ member }: Props) {
   }, [member.characters]);
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-300 shadow-sm">
-      <div className="border-b border-base-300 bg-base-200 px-4 py-3">
-        <h3 className="text-base font-bold text-base-content">
-          {member.nickname?.trim() || '별명 없음'}
-        </h3>
+    <article className="flex flex-col overflow-hidden rounded-2xl border border-base-content/25 bg-base-300 shadow-sm">
+      <div className="border-b border-base-content/20 bg-base-200 px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="truncate text-base font-bold text-base-content">
+            {member.nickname?.trim() || '별명 없음'}
+          </h3>
+          {isMine ? (
+            <span className="badge badge-warning h-6 min-h-6 rounded-full px-2 text-[10px] font-semibold text-black">
+              my
+            </span>
+          ) : onToggleFavorite ? (
+            <div
+              className="tooltip tooltip-left"
+              data-tip={member.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+            >
+              <button
+                type="button"
+                className={`btn btn-ghost btn-xs h-7 min-h-7 w-7 rounded-full p-0 ${
+                  member.isFavorite ? 'text-warning' : 'text-base-content/60'
+                }`}
+                onClick={() => void onToggleFavorite(member)}
+                disabled={favoriteBusy}
+                aria-label={member.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+              >
+                {favoriteBusy ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <FavoriteStarIcon active={Boolean(member.isFavorite)} />
+                )}
+              </button>
+            </div>
+          ) : null}
+        </div>
         <p className="mt-1 text-[11px] text-base-content/60">
           캐릭터 {member.characters.length}명
         </p>
@@ -263,7 +315,7 @@ export function PartyMemberCard({ member }: Props) {
             공개할 캐릭터를 설정해주세요.
           </p>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(265px,1fr))] gap-3">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(252px,1fr))] gap-3">
             {sortedCharacters.map((c) => (
               <CharacterCard key={c.id} character={c} />
             ))}

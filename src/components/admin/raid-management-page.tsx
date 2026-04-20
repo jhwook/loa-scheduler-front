@@ -8,6 +8,7 @@ import {
   deleteRaid,
   deleteRaidGate,
   getAdminRaids,
+  patchAdminRaidOrder,
   getRaidGatesByRaidId,
   updateRaid,
   updateRaidGate,
@@ -46,6 +47,7 @@ export function RaidManagementPage() {
   const [togglePendingGateId, setTogglePendingGateId] = useState<number | null>(null);
   const [deletePendingRaidId, setDeletePendingRaidId] = useState<number | null>(null);
   const [updatePendingRaidId, setUpdatePendingRaidId] = useState<number | null>(null);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [editingRaid, setEditingRaid] = useState<RaidInfo | null>(null);
   const [editingGate, setEditingGate] = useState<RaidGateInfo | null>(null);
   const [message, setMessage] = useState<{
@@ -309,6 +311,42 @@ export function RaidManagementPage() {
     }
   }
 
+  async function handleReorderRaids(nextRaidIds: number[]) {
+    if (isSavingOrder) return;
+    const before = raids;
+    const byId = new Map(before.map((r) => [r.id, r] as const));
+    const reordered = nextRaidIds
+      .map((id) => byId.get(id))
+      .filter((x): x is RaidInfo => Boolean(x))
+      .map((raid, index) => ({ ...raid, orderNo: index + 1 }));
+    if (reordered.length !== before.length) return;
+
+    setRaids(reordered);
+    setIsSavingOrder(true);
+    setMessage(null);
+    try {
+      await patchAdminRaidOrder({
+        raidOrders: reordered.map((raid, index) => ({
+          raidInfoId: raid.id,
+          orderNo: index + 1,
+        })),
+      });
+      await refreshRaids(selectedRaidId ?? undefined);
+      setMessage({ type: "success", text: "레이드 순서를 저장했습니다." });
+    } catch (err) {
+      setRaids(before);
+      const text =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "레이드 순서 저장에 실패했습니다.";
+      setMessage({ type: "error", text });
+    } finally {
+      setIsSavingOrder(false);
+    }
+  }
+
   return (
     <div className="space-y-4 text-base-content">
       <div>
@@ -340,7 +378,9 @@ export function RaidManagementPage() {
             raids={raids}
             selectedRaidId={selectedRaidId}
             loading={raidsLoading}
+            isSavingOrder={isSavingOrder}
             onSelect={setSelectedRaidId}
+            onReorder={handleReorderRaids}
             togglePendingRaidId={togglePendingRaidId}
             deletePendingRaidId={deletePendingRaidId}
             updatePendingRaidId={updatePendingRaidId}

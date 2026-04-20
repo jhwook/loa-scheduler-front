@@ -65,6 +65,9 @@ function mapMember(member: PartyGroupDetailResponse["members"][number]): PartyGr
     nickname: member.nickname,
     displayName: member.displayName || member.nickname || member.username,
     role: member.role,
+    isFavorite:
+      typeof member.isFavorite === "boolean" ? member.isFavorite : undefined,
+    isMe: typeof member.isMe === "boolean" ? member.isMe : undefined,
     characters: (member.characters ?? []).map((c) => ({
       id: c.id,
       characterName: c.characterName,
@@ -125,6 +128,8 @@ function mapPublicMember(
         ? m.nickname
         : m.username,
     role: m.role,
+    isFavorite: typeof m.isFavorite === "boolean" ? m.isFavorite : undefined,
+    isMe: typeof m.isMe === "boolean" ? m.isMe : undefined,
     characters: (m.characters ?? []).map(mapPublicCharacter),
   };
 }

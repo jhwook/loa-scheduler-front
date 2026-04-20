@@ -3,7 +3,10 @@
 import { useMemo } from "react";
 
 import { normalizeRaidPartySize } from "@/types/raid";
-import type { RaidPartyDetail } from "@/types/raid-party";
+import type {
+  RaidPartyDetail,
+  RaidPartyDifficultyOption,
+} from "@/types/raid-party";
 
 import { RaidPartySlotGrid } from "./raid-party-slot-grid";
 
@@ -26,6 +29,12 @@ type Props = {
   /** 카드(제목 영역) 선택 — 삭제 대상 지정 */
   onSelectParty?: () => void;
   isPartySelected?: boolean;
+  myCharacterIds?: ReadonlySet<number>;
+  difficultyOptions?: RaidPartyDifficultyOption[];
+  difficultyLoading?: boolean;
+  onOpenDifficultyMenu?: () => void;
+  onChangeDifficulty?: (value: string | null) => void;
+  difficultyDisabled?: boolean;
 };
 
 export function RaidPartyDetailView({
@@ -38,6 +47,12 @@ export function RaidPartyDetailView({
   deletePartyDisabled = false,
   onSelectParty,
   isPartySelected = false,
+  myCharacterIds,
+  difficultyOptions = [],
+  difficultyLoading = false,
+  onOpenDifficultyMenu,
+  onChangeDifficulty,
+  difficultyDisabled = false,
 }: Props) {
   const memberBySlot = useMemo(() => {
     const m = new Map<
@@ -75,6 +90,7 @@ export function RaidPartyDetailView({
     detail.title?.trim() ||
     detail.raidInfo?.raidName ||
     "레이드 파티";
+  const difficulty = detail.selectedDifficulty?.trim() ?? "";
 
   const showDelete =
     Boolean(onDeleteRaidParty) &&
@@ -92,7 +108,7 @@ export function RaidPartyDetailView({
       }`}
     >
       <div
-        className={`relative mb-2 h-10 w-full min-w-0 shrink-0 overflow-hidden rounded-lg border border-primary/35 transition-colors sm:h-11 ${
+        className={`relative mb-2 h-10 w-full min-w-0 shrink-0 overflow-visible rounded-lg border border-primary/35 transition-colors sm:h-11 ${
           onSelectParty && isPartySelected
             ? "bg-primary/15"
             : "bg-primary/10"
@@ -142,10 +158,57 @@ export function RaidPartyDetailView({
             </span>
           ) : null}
         </div>
+        <div className="absolute left-2 top-1/2 z-[2] -translate-y-1/2">
+          <div className="dropdown dropdown-bottom">
+            <button
+              type="button"
+              className="badge badge-sm h-6 border border-primary/35 bg-base-200/70 px-2 text-[10px] font-semibold text-primary hover:bg-base-200"
+              disabled={difficultyDisabled}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenDifficultyMenu?.();
+              }}
+            >
+              {difficulty || "난이도 선택"}
+            </button>
+            <ul
+              tabIndex={0}
+              className="menu dropdown-content z-[200] mt-1 w-36 rounded-box border border-base-300 bg-base-200 p-1 shadow-lg"
+              role="menu"
+              aria-label="난이도 선택"
+            >
+              {difficultyLoading ? (
+                <li className="pointer-events-none px-2 py-1 text-xs text-base-content/70">
+                  불러오는 중…
+                </li>
+              ) : (
+                <>
+                  {difficultyOptions.map((opt) => (
+                    <li key={opt.value}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onChangeDifficulty?.(opt.value);
+                        }}
+                        className={difficulty === opt.value ? "active font-semibold" : ""}
+                      >
+                        {opt.label}
+                      </button>
+                    </li>
+                  ))}
+                </>
+              )}
+            </ul>
+          </div>
+        </div>
       </div>
       <RaidPartySlotGrid
         label=""
         cells={cells}
+        myCharacterIds={myCharacterIds}
         raidPartyId={detail.id}
         useDndKitDrop
         onDropCharacter={onAssignToSlot}

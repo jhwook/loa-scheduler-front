@@ -21,6 +21,8 @@ export type PartyGroupMemberResponse = {
   nickname: string | null;
   displayName: string;
   role: "OWNER" | "MEMBER" | string;
+  isFavorite?: boolean;
+  isMe?: boolean;
   joinedAt: string;
   characters: PartyCharacterResponse[];
 };
@@ -81,6 +83,8 @@ export type PartyGroupCharactersMemberResponse = {
   nickname: string | null;
   displayName: string;
   role: string;
+  isFavorite?: boolean;
+  isMe?: boolean;
   characters: PartyGroupPublicCharacterResponse[];
 };
 

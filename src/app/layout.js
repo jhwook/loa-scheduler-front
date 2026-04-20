@@ -25,7 +25,7 @@ export default function RootLayout({ children }) {
       >
         <AppMotionProvider>
           <AppHeader />
-          {children}
+          <div className="pt-16">{children}</div>
         </AppMotionProvider>
       </body>
     </html>

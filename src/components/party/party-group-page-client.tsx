@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import {
+  type WheelEvent as ReactWheelEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -41,9 +42,12 @@ import { CreateRaidPartyModal } from '@/components/raid-party/create-raid-party-
 import { RaidPartyDetailView } from '@/components/raid-party/raid-party-detail-view';
 import { createPartyGroupInvite } from '@/lib/api/party-group-invites';
 import {
+  addPartyGroupFavorite,
   getPartyBuilderCharacters,
   getPartyGroupCharacters,
+  getPartyGroupFavorites,
   leavePartyGroup,
+  removePartyGroupFavorite,
   deletePartyGroup,
   updatePartyGroupMemberNickname,
   getPartyGroupMyCharacters,
@@ -60,7 +64,9 @@ import {
   assignRaidPartySlot,
   deleteRaidParty,
   getRaidPartiesByGroup,
+  getRaidPartyDifficultyOptions,
   getRaidPartyById,
+  patchRaidParty,
   patchRaidPartyMemberPosition,
   removeRaidPartyMember,
 } from '@/lib/api/raid-party';
@@ -87,6 +93,7 @@ import type {
 import type { LevelRangeFilter } from '@/types/level-range-filter';
 import {
   globalSlotIndexToPartyAndSlot,
+  type RaidPartyDifficultyOption,
   type RaidPartyDetail,
   type RaidPartyListItem,
 } from '@/types/raid-party';
@@ -102,6 +109,21 @@ type GroupConfirmAction = 'leave' | 'delete';
 function partyTabCollisionDetection(args: Parameters<typeof closestCenter>[0]) {
   const hit = pointerWithin(args);
   return hit.length > 0 ? hit : closestCenter(args);
+}
+
+function passWheelToOuterScroll(
+  e: ReactWheelEvent<HTMLDivElement>,
+): void {
+  const el = e.currentTarget;
+  const { deltaY } = e;
+  if (deltaY === 0) return;
+  const atTop = el.scrollTop <= 0;
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+  const shouldPassDown = deltaY > 0 && atBottom;
+  const shouldPassUp = deltaY < 0 && atTop;
+  if (!shouldPassDown && !shouldPassUp) return;
+  e.preventDefault();
+  window.scrollBy({ top: deltaY });
 }
 
 function parseItemAvgLevelParty(level: string | null | undefined): number {
@@ -224,6 +246,12 @@ export function PartyGroupPageClient({ groupId }: Props) {
   );
   const [createRaidPartyModalOpen, setCreateRaidPartyModalOpen] =
     useState(false);
+  const [raidPartyDifficultyOptions, setRaidPartyDifficultyOptions] = useState<
+    Record<number, RaidPartyDifficultyOption[]>
+  >({});
+  const [raidPartyDifficultyLoading, setRaidPartyDifficultyLoading] = useState<
+    Record<number, boolean>
+  >({});
   /** 공대 캐릭터 풀 정렬 순서 — 저장 시 `@/lib/party-pool-order`의 `buildPartyPoolOrderPayload(partyPoolOrderIds)` 사용 */
   const [partyPoolOrderIds, setPartyPoolOrderIds] = useState<number[]>([]);
   const [partyPoolRows, setPartyPoolRows] = useState<PartyPoolOrderedRow[]>([]);
@@ -254,6 +282,15 @@ export function PartyGroupPageClient({ groupId }: Props) {
     titleLabel: string;
   } | null>(null);
   const [raidPartyDeleteBusy, setRaidPartyDeleteBusy] = useState(false);
+  const [selectedRaidInfoFilterId, setSelectedRaidInfoFilterId] = useState<
+    number | null
+  >(null);
+  const [selectedDifficultyFilter, setSelectedDifficultyFilter] = useState<
+    string | null
+  >(null);
+  const [favoriteBusyUserIds, setFavoriteBusyUserIds] = useState<Set<number>>(
+    new Set()
+  );
 
   const publicCharGrouped = useMemo(
     () => groupPartyMyCharsByServer(publicCharRows),
@@ -274,9 +311,34 @@ export function PartyGroupPageClient({ groupId }: Props) {
       if (showBusy) setBusy(true);
       setError(null);
       try {
-        const raw = await getPartyGroupCharacters(groupId);
+        const [raw, favoriteQuery] = await Promise.all([
+          getPartyGroupCharacters(groupId),
+          getPartyGroupFavorites(groupId)
+            .then((ids) => ({ ok: true as const, ids }))
+            .catch(() => ({ ok: false as const, ids: [] as number[] })),
+        ]);
         const mapped = mapPartyGroupCharactersResponseToViewModel(raw);
-        setGroup(mapped);
+        const favoriteSet = new Set(favoriteQuery.ids);
+        const nextMembers = mapped.members.map((member) => {
+          const isMe =
+            meUserId != null
+              ? member.userId === meUserId
+              : Boolean(member.isMe);
+          const isFavorite = isMe
+            ? false
+            : favoriteQuery.ok
+              ? favoriteSet.has(member.userId)
+              : Boolean(member.isFavorite);
+          return {
+            ...member,
+            isMe,
+            isFavorite,
+          };
+        });
+        setGroup({
+          ...mapped,
+          members: nextMembers,
+        });
         setNicknameDrafts(
           Object.fromEntries(mapped.members.map((m) => [m.id, '']))
         );
@@ -289,7 +351,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
         if (showBusy) setBusy(false);
       }
     },
-    [groupId]
+    [groupId, meUserId]
   );
 
   const loadRaidPartyList = useCallback(async () => {
@@ -382,6 +444,42 @@ export function PartyGroupPageClient({ groupId }: Props) {
     [group]
   );
 
+  const groupNicknameByCharacterId = useMemo(() => {
+    const map = new Map<number, string>();
+    if (!group) return map;
+    for (const member of group.members) {
+      const label =
+        member.nickname?.trim() || member.displayName?.trim() || '별명 없음';
+      for (const ch of member.characters) {
+        map.set(ch.id, label);
+      }
+    }
+    return map;
+  }, [group]);
+
+  const applyGroupNicknameToDetail = useCallback(
+    (detail: RaidPartyDetail): RaidPartyDetail => {
+      return {
+        ...detail,
+        members: detail.members.map((m) => {
+          const resolved = groupNicknameByCharacterId
+            .get(m.character.id)
+            ?.trim();
+          if (!resolved) return m;
+          if (m.character.groupNickname?.trim() === resolved) return m;
+          return {
+            ...m,
+            character: {
+              ...m.character,
+              groupNickname: resolved,
+            },
+          };
+        }),
+      };
+    },
+    [groupNicknameByCharacterId]
+  );
+
   const assignCharacterToRaidPartySlot = useCallback(
     async (
       raidPartyId: number,
@@ -404,12 +502,13 @@ export function PartyGroupPageClient({ groupId }: Props) {
         );
         const positionRole = normalizePartyRole(poolRow?.character.partyRole);
 
-        const updated = await assignRaidPartySlot(raidPartyId, {
+        const updatedRaw = await assignRaidPartySlot(raidPartyId, {
           characterId,
           partyNumber,
           slotNumber,
           positionRole,
         });
+        const updated = applyGroupNicknameToDetail(updatedRaw);
         setRaidPartyDetails((prev) => ({ ...prev, [raidPartyId]: updated }));
         setRaidPartyList((list) =>
           list.map((row) =>
@@ -432,7 +531,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
         setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
       }
     },
-    [partyPoolRows, raidPartyDetails, raidPartyList]
+    [applyGroupNicknameToDetail, partyPoolRows, raidPartyDetails, raidPartyList]
   );
 
   const moveRaidPartyMemberToSlot = useCallback(
@@ -470,11 +569,12 @@ export function PartyGroupPageClient({ groupId }: Props) {
           partySize
         );
         const positionRole = normalizePartyRole(assignment.character.partyRole);
-        const updated = await patchRaidPartyMemberPosition(
+        const updatedRaw = await patchRaidPartyMemberPosition(
           raidPartyId,
           memberId,
           { partyNumber, slotNumber, positionRole }
         );
+        const updated = applyGroupNicknameToDetail(updatedRaw);
         setRaidPartyDetails((prev) => ({ ...prev, [raidPartyId]: updated }));
         setRaidPartyList((list) =>
           list.map((row) =>
@@ -497,7 +597,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
         setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
       }
     },
-    [raidPartyDetails, raidPartyList]
+    [applyGroupNicknameToDetail, raidPartyDetails, raidPartyList]
   );
 
   const removeRaidPartyMemberFromSlot = useCallback(
@@ -506,7 +606,8 @@ export function PartyGroupPageClient({ groupId }: Props) {
       raidPartyAssignFlightRef.current.add(raidPartyId);
       setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: true }));
       try {
-        const updated = await removeRaidPartyMember(raidPartyId, memberId);
+        const updatedRaw = await removeRaidPartyMember(raidPartyId, memberId);
+        const updated = applyGroupNicknameToDetail(updatedRaw);
         setRaidPartyDetails((prev) => ({ ...prev, [raidPartyId]: updated }));
         setRaidPartyList((list) =>
           list.map((row) =>
@@ -529,23 +630,104 @@ export function PartyGroupPageClient({ groupId }: Props) {
         setRaidPartyAssignBusy((prev) => ({ ...prev, [raidPartyId]: false }));
       }
     },
+    [applyGroupNicknameToDetail]
+  );
+
+  const ensureRaidPartyDifficultyOptions = useCallback(
+    async (party: RaidPartyListItem): Promise<void> => {
+      if (raidPartyDifficultyOptions[party.id]) return;
+      if (raidPartyDifficultyLoading[party.id]) return;
+      if (!group) return;
+      const raidInfoId =
+        Number.isFinite(party.raidInfoId) && party.raidInfoId > 0
+          ? party.raidInfoId
+          : null;
+      if (!raidInfoId) return;
+      setRaidPartyDifficultyLoading((prev) => ({ ...prev, [party.id]: true }));
+      try {
+        const rows = await getRaidPartyDifficultyOptions(group.id, raidInfoId);
+        setRaidPartyDifficultyOptions((prev) => ({
+          ...prev,
+          [party.id]: rows,
+        }));
+      } catch {
+        setRaidPartyDifficultyOptions((prev) => ({ ...prev, [party.id]: [] }));
+      } finally {
+        setRaidPartyDifficultyLoading((prev) => ({
+          ...prev,
+          [party.id]: false,
+        }));
+      }
+    },
+    [group, raidPartyDifficultyLoading, raidPartyDifficultyOptions]
+  );
+
+  const changeRaidPartyDifficulty = useCallback(
+    async (party: RaidPartyListItem, value: string | null): Promise<void> => {
+      try {
+        const updated = await patchRaidParty(party.id, {
+          selectedDifficulty: value,
+        });
+        setRaidPartyList((prev) =>
+          prev.map((row) =>
+            row.id === party.id
+              ? {
+                  ...row,
+                  selectedDifficulty: updated.selectedDifficulty ?? null,
+                }
+              : row
+          )
+        );
+        setRaidPartyDetails((prev) => {
+          const detail = prev[party.id];
+          if (!detail) return prev;
+          return {
+            ...prev,
+            [party.id]: {
+              ...detail,
+              selectedDifficulty: updated.selectedDifficulty ?? null,
+            },
+          };
+        });
+        setToast({ kind: 'ok', text: '난이도를 변경했습니다.' });
+      } catch (err) {
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : '난이도 변경에 실패했습니다.';
+        setToast({ kind: 'err', text: msg });
+      }
+    },
     []
   );
 
+  const partyPoolDisplayRows = useMemo(() => {
+    return partyPoolRows.map((row) => {
+      const label =
+        groupNicknameByCharacterId.get(row.character.id)?.trim() ||
+        row.ownerDisplayName?.trim() ||
+        '별명 없음';
+      if (label === row.ownerDisplayName) return row;
+      return { ...row, ownerDisplayName: label };
+    });
+  }, [partyPoolRows, groupNicknameByCharacterId]);
+
   const partyPoolCanonicalIds = useMemo(
-    () => partyPoolRows.map((x) => x.character.id),
-    [partyPoolRows]
+    () => partyPoolDisplayRows.map((x) => x.character.id),
+    [partyPoolDisplayRows]
   );
 
   useEffect(() => {
-    if (partyPoolRows.length === 0) {
+    if (partyPoolDisplayRows.length === 0) {
       setLevelMinBound(1640);
       setLevelMaxBound(1800);
       setSelectedMinLevel(1640);
       setSelectedMaxLevel(1800);
       return;
     }
-    const levels = partyPoolRows.map((r) =>
+    const levels = partyPoolDisplayRows.map((r) =>
       parseItemLevel(r.character.itemAvgLevel)
     );
     const min = Math.floor(Math.min(...levels));
@@ -556,13 +738,13 @@ export function PartyGroupPageClient({ groupId }: Props) {
     setLevelMaxBound(safeMax);
     setSelectedMinLevel(safeMin);
     setSelectedMaxLevel(safeMax);
-  }, [partyPoolRows]);
+  }, [partyPoolDisplayRows]);
 
   const rowById = useMemo(() => {
     const m = new Map<number, PartyPoolOrderedRow>();
-    for (const row of partyPoolRows) m.set(row.character.id, row);
+    for (const row of partyPoolDisplayRows) m.set(row.character.id, row);
     return m;
-  }, [partyPoolRows]);
+  }, [partyPoolDisplayRows]);
 
   const orderedPartyPoolRows = useMemo(
     () =>
@@ -645,8 +827,8 @@ export function PartyGroupPageClient({ groupId }: Props) {
     if (!partyDndActiveId) return null;
     const cid = parsePoolCharDndId(partyDndActiveId);
     if (cid == null) return null;
-    return partyPoolRows.find((r) => r.character.id === cid) ?? null;
-  }, [partyDndActiveId, partyPoolRows]);
+    return partyPoolDisplayRows.find((r) => r.character.id === cid) ?? null;
+  }, [partyDndActiveId, partyPoolDisplayRows]);
 
   const partyDndActiveSlotDrag = useMemo(() => {
     if (!partyDndActiveId) return null;
@@ -655,14 +837,16 @@ export function PartyGroupPageClient({ groupId }: Props) {
     const detail = raidPartyDetails[parsed.raidPartyId];
     const row = detail?.members.find((m) => m.memberId === parsed.memberId);
     if (!row) return null;
-    const ownerLabel = row.character.ownerDisplayName?.trim()
-      ? row.character.ownerDisplayName.trim()
-      : '별명 없음';
+    const ownerLabel =
+      row.character.groupNickname?.trim() ||
+      groupNicknameByCharacterId.get(row.character.id)?.trim() ||
+      row.character.ownerDisplayName?.trim() ||
+      '별명 없음';
     return {
       ownerLabel,
       character: row.character,
     };
-  }, [partyDndActiveId, raidPartyDetails]);
+  }, [partyDndActiveId, raidPartyDetails, groupNicknameByCharacterId]);
 
   const handlePartyTabDragStart = useCallback((e: DragStartEvent) => {
     setPartyDndActiveId(String(e.active.id));
@@ -698,10 +882,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
 
       // 공대 캐릭터 목록 내 카드 간 순서 변경은 허용하지 않음.
     },
-    [
-      assignCharacterToRaidPartySlot,
-      moveRaidPartyMemberToSlot,
-    ]
+    [assignCharacterToRaidPartySlot, moveRaidPartyMemberToSlot]
   );
 
   const handlePartyTabDragCancel = useCallback(() => {
@@ -724,6 +905,89 @@ export function PartyGroupPageClient({ groupId }: Props) {
     if (!group || meUserId == null) return null;
     return group.members.find((m) => m.userId === meUserId) ?? null;
   }, [group, meUserId]);
+
+  const myCharacterIds = useMemo(() => {
+    return new Set((myMemberInGroup?.characters ?? []).map((c) => c.id));
+  }, [myMemberInGroup]);
+
+  const statusMembers = useMemo(() => {
+    if (!group) return [];
+    const mine: typeof group.members = [];
+    const favorites: typeof group.members = [];
+    const rest: typeof group.members = [];
+    for (const member of group.members) {
+      const resolved = {
+        ...member,
+        isMe:
+          meUserId != null ? member.userId === meUserId : Boolean(member.isMe),
+      };
+      if (resolved.isMe) {
+        mine.push(resolved);
+        continue;
+      }
+      if (resolved.isFavorite) {
+        favorites.push(resolved);
+        continue;
+      }
+      rest.push(resolved);
+    }
+    return [...mine, ...favorites, ...rest];
+  }, [group, meUserId]);
+
+  const raidFilterOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const party of raidPartyList) {
+      if (!map.has(party.raidInfoId)) {
+        map.set(
+          party.raidInfoId,
+          party.raidName?.trim() || `레이드 #${party.raidInfoId}`
+        );
+      }
+    }
+    return [...map.entries()].map(([id, raidName]) => ({ id, raidName }));
+  }, [raidPartyList]);
+
+  const difficultyFilterOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const party of raidPartyList) {
+      if (
+        selectedRaidInfoFilterId != null &&
+        party.raidInfoId !== selectedRaidInfoFilterId
+      ) {
+        continue;
+      }
+      const difficulty = party.selectedDifficulty?.trim();
+      if (difficulty) set.add(difficulty);
+    }
+    return [...set];
+  }, [raidPartyList, selectedRaidInfoFilterId]);
+
+  const filteredRaidPartyList = useMemo(() => {
+    return raidPartyList.filter((party) => {
+      if (
+        selectedRaidInfoFilterId != null &&
+        party.raidInfoId !== selectedRaidInfoFilterId
+      ) {
+        return false;
+      }
+      if (
+        selectedDifficultyFilter &&
+        party.selectedDifficulty?.trim() !== selectedDifficultyFilter
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [raidPartyList, selectedRaidInfoFilterId, selectedDifficultyFilter]);
+
+  useEffect(() => {
+    if (
+      selectedDifficultyFilter &&
+      !difficultyFilterOptions.includes(selectedDifficultyFilter)
+    ) {
+      setSelectedDifficultyFilter(null);
+    }
+  }, [difficultyFilterOptions, selectedDifficultyFilter]);
 
   useEffect(() => {
     if (!toast) return;
@@ -765,7 +1029,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
       raidPartyList.forEach((p, i) => {
         const r = results[i];
         if (r.status === 'fulfilled') {
-          next[p.id] = r.value;
+          next[p.id] = applyGroupNicknameToDetail(r.value);
         } else {
           const reason = r.reason;
           errs[p.id] =
@@ -783,7 +1047,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, raidPartyList]);
+  }, [activeTab, applyGroupNicknameToDetail, raidPartyList]);
 
   useEffect(() => {
     if (activeTab !== 'party') {
@@ -986,6 +1250,64 @@ export function PartyGroupPageClient({ groupId }: Props) {
     }
   }
 
+  async function onToggleFavorite(memberUserId: number) {
+    if (!group) return;
+    const target = group.members.find((m) => m.userId === memberUserId);
+    if (!target) return;
+    const isMe =
+      meUserId != null ? target.userId === meUserId : Boolean(target.isMe);
+    if (isMe) return;
+    if (favoriteBusyUserIds.has(memberUserId)) return;
+
+    const nextFavorite = !Boolean(target.isFavorite);
+    setFavoriteBusyUserIds((prev) => {
+      const next = new Set(prev);
+      next.add(memberUserId);
+      return next;
+    });
+    setGroup((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        members: prev.members.map((m) =>
+          m.userId === memberUserId ? { ...m, isFavorite: nextFavorite } : m
+        ),
+      };
+    });
+    try {
+      if (nextFavorite) {
+        await addPartyGroupFavorite(group.id, memberUserId);
+        setToast({ kind: 'ok', text: '즐겨찾기에 추가했습니다.' });
+      } else {
+        await removePartyGroupFavorite(group.id, memberUserId);
+        setToast({ kind: 'ok', text: '즐겨찾기를 해제했습니다.' });
+      }
+    } catch (err) {
+      setGroup((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          members: prev.members.map((m) =>
+            m.userId === memberUserId ? { ...m, isFavorite: !nextFavorite } : m
+          ),
+        };
+      });
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '즐겨찾기 처리에 실패했습니다.';
+      setToast({ kind: 'err', text: msg });
+    } finally {
+      setFavoriteBusyUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(memberUserId);
+        return next;
+      });
+    }
+  }
+
   if (busy) {
     return (
       <div className="rounded-2xl border border-base-300 bg-base-300 p-6 text-base-content shadow-sm">
@@ -1036,7 +1358,7 @@ export function PartyGroupPageClient({ groupId }: Props) {
 
   return (
     <div className="flex min-h-[calc(100vh-6rem)] flex-col gap-6">
-      <div className="navbar rounded-2xl border border-base-300 bg-base-300 px-4 text-base-content shadow-sm">
+      <div className="navbar sticky top-16 z-30 rounded-2xl border border-base-300 bg-base-300/95 px-4 text-base-content shadow-sm backdrop-blur supports-[backdrop-filter]:bg-base-300/85">
         <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -1099,9 +1421,17 @@ export function PartyGroupPageClient({ groupId }: Props) {
               공대원이 없습니다.
             </p>
           ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              {group.members.map((m) => (
-                <PartyMemberCard key={m.id} member={m} />
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {statusMembers.map((m) => (
+                <PartyMemberCard
+                  key={m.id}
+                  member={m}
+                  isMine={
+                    meUserId != null ? m.userId === meUserId : Boolean(m.isMe)
+                  }
+                  favoriteBusy={favoriteBusyUserIds.has(m.userId)}
+                  onToggleFavorite={(member) => onToggleFavorite(member.userId)}
+                />
               ))}
             </div>
           )}
@@ -1175,14 +1505,18 @@ export function PartyGroupPageClient({ groupId }: Props) {
                     주세요.
                   </p>
                 ) : (
-                  <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
+                  <div
+                    className="mt-2 max-h-[60vh] overflow-y-auto pr-1"
+                    onWheel={passWheelToOuterScroll}
+                  >
                     <SortableContext
                       items={visiblePartyPoolOrderIds.map(poolCharDndId)}
                       strategy={rectSortingStrategy}
                     >
                       <PartyPoolSortableGrid
-                        rows={partyPoolRows}
+                        rows={partyPoolDisplayRows}
                         sections={poolRenderableSections}
+                        myCharacterIds={myCharacterIds}
                       />
                     </SortableContext>
                   </div>
@@ -1215,70 +1549,195 @@ export function PartyGroupPageClient({ groupId }: Props) {
                     </p>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-start gap-4">
-                    {raidPartyList.map((p) => {
-                      const detail = raidPartyDetails[p.id];
-                      const rowErr = raidPartyDetailErrors[p.id];
-                      return (
-                        <div key={p.id} className="w-[28rem] shrink-0">
-                          {raidPartyDetailsLoading && !detail && !rowErr ? (
-                            <div className="rounded-xl border border-base-300 bg-base-200/30 p-3">
-                              <div className="space-y-2">
-                                <div className="skeleton h-10 w-full rounded-lg" />
-                                <div className="skeleton h-36 w-full rounded-lg" />
-                              </div>
-                            </div>
-                          ) : rowErr ? (
-                            <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-4 py-6 text-sm text-rose-100">
-                              {rowErr}
-                            </div>
-                          ) : detail ? (
-                            <RaidPartyDetailView
-                              detail={detail}
-                              isPartySelected={focusedRaidPartyId === p.id}
-                              onSelectParty={() => setFocusedRaidPartyId(p.id)}
-                              onAssignToSlot={(slotIndex, characterId) =>
-                                void assignCharacterToRaidPartySlot(
-                                  p.id,
-                                  slotIndex,
-                                  characterId
-                                )
-                              }
-                              onMoveMemberToSlot={(memberId, targetSlotIndex) =>
-                                void moveRaidPartyMemberToSlot(
-                                  p.id,
-                                  memberId,
-                                  targetSlotIndex
-                                )
-                              }
-                              onRemoveMember={(memberId) =>
-                                void removeRaidPartyMemberFromSlot(
-                                  p.id,
-                                  memberId
-                                )
-                              }
-                              onDeleteRaidParty={() =>
-                                setRaidPartyDeleteDraft({
-                                  id: p.id,
-                                  titleLabel:
-                                    detail.title?.trim() ||
-                                    detail.raidInfo?.raidName ||
-                                    p.raidName ||
-                                    `파티 #${p.id}`,
-                                })
-                              }
-                              deletePartyDisabled={
-                                raidPartyDeleteBusy ||
-                                (raidPartyAssignBusy[p.id] ?? false)
-                              }
-                              assignmentBusy={
-                                raidPartyAssignBusy[p.id] ?? false
-                              }
-                            />
-                          ) : null}
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-base-300 bg-base-200/40 p-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="badge badge-ghost text-xs">
+                          레이드
+                        </span>
+                        <div className="filter gap-1">
+                          <button
+                            type="button"
+                            className={`btn btn-xs sm:btn-sm ${
+                              selectedRaidInfoFilterId == null
+                                ? 'btn-primary text-primary-content'
+                                : 'btn-outline border-base-300 text-base-content'
+                            }`}
+                            onClick={() => {
+                              setSelectedRaidInfoFilterId(null);
+                              setSelectedDifficultyFilter(null);
+                            }}
+                          >
+                            전체
+                          </button>
+                          {raidFilterOptions.map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              className={`btn btn-xs sm:btn-sm ${
+                                selectedRaidInfoFilterId === opt.id
+                                  ? 'btn-primary text-primary-content'
+                                  : 'btn-outline border-base-300 text-base-content'
+                              }`}
+                              onClick={() => {
+                                setSelectedRaidInfoFilterId(opt.id);
+                                setSelectedDifficultyFilter(null);
+                              }}
+                            >
+                              {opt.raidName}
+                            </button>
+                          ))}
                         </div>
-                      );
-                    })}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="badge badge-ghost text-xs">
+                          난이도
+                        </span>
+                        <div className="filter gap-1">
+                          <button
+                            type="button"
+                            className={`btn btn-xs sm:btn-sm ${
+                              selectedDifficultyFilter == null
+                                ? 'btn-secondary text-secondary-content'
+                                : 'btn-outline border-base-300 text-base-content'
+                            }`}
+                            onClick={() => setSelectedDifficultyFilter(null)}
+                          >
+                            전체
+                          </button>
+                          {difficultyFilterOptions.map((difficulty) => (
+                            <button
+                              key={difficulty}
+                              type="button"
+                              className={`btn btn-xs sm:btn-sm ${
+                                selectedDifficultyFilter === difficulty
+                                  ? 'btn-secondary text-secondary-content'
+                                  : 'btn-outline border-base-300 text-base-content'
+                              }`}
+                              onClick={() =>
+                                setSelectedDifficultyFilter(difficulty)
+                              }
+                            >
+                              {difficulty}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {selectedRaidInfoFilterId != null ||
+                      selectedDifficultyFilter ? (
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => {
+                              setSelectedRaidInfoFilterId(null);
+                              setSelectedDifficultyFilter(null);
+                            }}
+                          >
+                            필터 초기화
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    {filteredRaidPartyList.length === 0 ? (
+                      <div className="alert border border-base-300 bg-base-200/40 text-base-content/80">
+                        <span className="text-sm">
+                          현재 필터 조건에 맞는 파티가 없습니다.
+                        </span>
+                      </div>
+                    ) : null}
+                    <div
+                      className="max-h-[100vh] overflow-y-auto pr-1"
+                      onWheel={passWheelToOuterScroll}
+                    >
+                      <div className="flex flex-wrap items-start gap-4">
+                        {filteredRaidPartyList.map((p) => {
+                          const detail = raidPartyDetails[p.id];
+                          const rowErr = raidPartyDetailErrors[p.id];
+                          return (
+                            <div key={p.id} className="w-[28rem] shrink-0">
+                              {raidPartyDetailsLoading && !detail && !rowErr ? (
+                                <div className="rounded-xl border border-base-300 bg-base-200/30 p-3">
+                                  <div className="space-y-2">
+                                    <div className="skeleton h-10 w-full rounded-lg" />
+                                    <div className="skeleton h-36 w-full rounded-lg" />
+                                  </div>
+                                </div>
+                              ) : rowErr ? (
+                                <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 px-4 py-6 text-sm text-rose-100">
+                                  {rowErr}
+                                </div>
+                              ) : detail ? (
+                                <RaidPartyDetailView
+                                  detail={detail}
+                                  myCharacterIds={myCharacterIds}
+                                  isPartySelected={focusedRaidPartyId === p.id}
+                                  onSelectParty={() =>
+                                    setFocusedRaidPartyId(p.id)
+                                  }
+                                  onAssignToSlot={(slotIndex, characterId) =>
+                                    void assignCharacterToRaidPartySlot(
+                                      p.id,
+                                      slotIndex,
+                                      characterId
+                                    )
+                                  }
+                                  onMoveMemberToSlot={(
+                                    memberId,
+                                    targetSlotIndex
+                                  ) =>
+                                    void moveRaidPartyMemberToSlot(
+                                      p.id,
+                                      memberId,
+                                      targetSlotIndex
+                                    )
+                                  }
+                                  onRemoveMember={(memberId) =>
+                                    void removeRaidPartyMemberFromSlot(
+                                      p.id,
+                                      memberId
+                                    )
+                                  }
+                                  onDeleteRaidParty={() =>
+                                    setRaidPartyDeleteDraft({
+                                      id: p.id,
+                                      titleLabel:
+                                        detail.title?.trim() ||
+                                        detail.raidInfo?.raidName ||
+                                        p.raidName ||
+                                        `파티 #${p.id}`,
+                                    })
+                                  }
+                                  difficultyOptions={
+                                    raidPartyDifficultyOptions[p.id] ?? []
+                                  }
+                                  difficultyLoading={
+                                    raidPartyDifficultyLoading[p.id] ?? false
+                                  }
+                                  onOpenDifficultyMenu={() =>
+                                    void ensureRaidPartyDifficultyOptions(p)
+                                  }
+                                  onChangeDifficulty={(v) =>
+                                    void changeRaidPartyDifficulty(p, v)
+                                  }
+                                  difficultyDisabled={
+                                    raidPartyDeleteBusy ||
+                                    (raidPartyAssignBusy[p.id] ?? false)
+                                  }
+                                  deletePartyDisabled={
+                                    raidPartyDeleteBusy ||
+                                    (raidPartyAssignBusy[p.id] ?? false)
+                                  }
+                                  assignmentBusy={
+                                    raidPartyAssignBusy[p.id] ?? false
+                                  }
+                                />
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
               </section>
@@ -1291,6 +1750,15 @@ export function PartyGroupPageClient({ groupId }: Props) {
                     character={partyDndActiveSlotDrag.character}
                     draggable={false}
                     variant="slot"
+                    headerTrailing={
+                      myCharacterIds.has(
+                        partyDndActiveSlotDrag.character.id
+                      ) ? (
+                        <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
+                          my
+                        </span>
+                      ) : undefined
+                    }
                   />
                 </div>
               ) : partyDndActiveRow ? (
@@ -1299,6 +1767,13 @@ export function PartyGroupPageClient({ groupId }: Props) {
                     memberNickname={partyDndActiveRow.ownerDisplayName}
                     character={partyDndActiveRow.character}
                     draggable={false}
+                    headerTrailing={
+                      myCharacterIds.has(partyDndActiveRow.character.id) ? (
+                        <span className="badge badge-warning h-4 min-h-4 rounded-full px-1.5 text-[8px] leading-none text-black">
+                          my
+                        </span>
+                      ) : undefined
+                    }
                   />
                 </div>
               ) : null}

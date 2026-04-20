@@ -49,6 +49,15 @@ export type CreateRaidRequest = {
 
 export type UpdateRaidRequest = Partial<CreateRaidRequest>;
 
+export type AdminRaidOrderItem = {
+  raidInfoId: number;
+  orderNo: number;
+};
+
+export type PatchAdminRaidOrderRequest = {
+  raidOrders: AdminRaidOrderItem[];
+};
+
 export type CreateRaidGateRequest = {
   difficulty: string;
   gateNumber: number;
