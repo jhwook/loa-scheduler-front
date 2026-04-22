@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch } from '@/lib/api/client';
 import type {
   PatchAdminRaidOrderRequest,
   CharacterWeeklyRaidItem,
@@ -15,28 +15,32 @@ import type {
   UpdateRaidRequest,
   UpdateRaidGateRequest,
   UpdateCharacterWeeklyRaidRequest,
-} from "@/types/raid";
+} from '@/types/raid';
 
-const ADMIN_RAIDS_PATH = "/raid-info/admin/raids";
-const ADMIN_GATES_PATH = "/raid-info/admin/gates";
-const ADMIN_RAID_ORDER_PATH = "/raid-info/admin/order";
+const ADMIN_RAIDS_PATH = '/raid-info/admin/raids';
+const ADMIN_GATES_PATH = '/raid-info/admin/gates';
+const ADMIN_RAID_ORDER_PATH = '/raid-info/admin/order';
 
-type RaidListResponse =
-  | unknown[]
-  | { raids?: unknown[]; data?: unknown[] };
+type RaidListResponse = unknown[] | { raids?: unknown[]; data?: unknown[] };
 type RaidGateListResponse =
   | RaidGateInfo[]
-  | { raidGates?: RaidGateInfo[]; gates?: RaidGateInfo[]; data?: RaidGateInfo[] };
+  | {
+      raidGates?: RaidGateInfo[];
+      gates?: RaidGateInfo[];
+      data?: RaidGateInfo[];
+    };
 
 function extractRaidListRaw(raw: RaidListResponse): unknown[] {
   if (Array.isArray(raw)) return raw;
-  if (raw && typeof raw === "object" && Array.isArray(raw.raids)) return raw.raids;
-  if (raw && typeof raw === "object" && Array.isArray(raw.data)) return raw.data;
+  if (raw && typeof raw === 'object' && Array.isArray(raw.raids))
+    return raw.raids;
+  if (raw && typeof raw === 'object' && Array.isArray(raw.data))
+    return raw.data;
   return [];
 }
 
 function asObjectRecord(row: unknown): Record<string, unknown> {
-  return row !== null && typeof row === "object"
+  return row !== null && typeof row === 'object'
     ? (row as Record<string, unknown>)
     : {};
 }
@@ -53,8 +57,8 @@ function mapAdminRaidFromApi(row: unknown): RaidInfo {
 
   return {
     id: Number(r.id),
-    raidName: String(r.raidName ?? r.raid_name ?? ""),
-    description: String(r.description ?? ""),
+    raidName: String(r.raidName ?? r.raid_name ?? ''),
+    description: String(r.description ?? ''),
     ...(partySize !== undefined ? { partySize } : {}),
     orderNo: Number(r.orderNo ?? r.order_no ?? 0),
     isActive: Boolean(r.isActive ?? r.is_active ?? false),
@@ -71,105 +75,107 @@ function extractRaidGateList(raw: RaidGateListResponse): RaidGateInfo[] {
 
 export async function getAdminRaids(): Promise<RaidInfo[]> {
   const raw = await apiFetch<RaidListResponse>(ADMIN_RAIDS_PATH, {
-    method: "GET",
+    method: 'GET',
   });
   return extractRaidListRaw(raw).map(mapAdminRaidFromApi);
 }
 
 export async function createRaid(payload: CreateRaidRequest): Promise<void> {
   await apiFetch<unknown>(ADMIN_RAIDS_PATH, {
-    method: "POST",
+    method: 'POST',
     json: payload,
   });
 }
 
 export async function updateRaid(
   raidId: number,
-  payload: UpdateRaidRequest,
+  payload: UpdateRaidRequest
 ): Promise<void> {
   await apiFetch<unknown>(`${ADMIN_RAIDS_PATH}/${raidId}`, {
-    method: "PATCH",
+    method: 'PATCH',
     json: payload,
   });
 }
 
 export async function deleteRaid(raidId: number): Promise<void> {
   await apiFetch<unknown>(`${ADMIN_RAIDS_PATH}/${raidId}`, {
-    method: "DELETE",
+    method: 'DELETE',
   });
 }
 
 export async function patchAdminRaidOrder(
-  payload: PatchAdminRaidOrderRequest,
+  payload: PatchAdminRaidOrderRequest
 ): Promise<void> {
   await apiFetch<unknown>(ADMIN_RAID_ORDER_PATH, {
-    method: "PATCH",
+    method: 'PATCH',
     json: payload,
   });
 }
 
-export async function getRaidGatesByRaidId(raidId: number): Promise<RaidGateInfo[]> {
+export async function getRaidGatesByRaidId(
+  raidId: number
+): Promise<RaidGateInfo[]> {
   const raw = await apiFetch<RaidGateListResponse>(
     `${ADMIN_RAIDS_PATH}/${raidId}/gates`,
     {
-      method: "GET",
-    },
+      method: 'GET',
+    }
   );
   return extractRaidGateList(raw);
 }
 
 export async function createRaidGate(
   raidId: number,
-  payload: CreateRaidGateRequest,
+  payload: CreateRaidGateRequest
 ): Promise<void> {
   await apiFetch<unknown>(`${ADMIN_RAIDS_PATH}/${raidId}/gates`, {
-    method: "POST",
+    method: 'POST',
     json: payload,
   });
 }
 
 export async function updateRaidGate(
   gateId: number,
-  payload: UpdateRaidGateRequest,
+  payload: UpdateRaidGateRequest
 ): Promise<void> {
   await apiFetch<unknown>(`${ADMIN_GATES_PATH}/${gateId}`, {
-    method: "PATCH",
+    method: 'PATCH',
     json: payload,
   });
 }
 
 export async function deleteRaidGate(gateId: number): Promise<void> {
   await apiFetch<unknown>(`${ADMIN_GATES_PATH}/${gateId}`, {
-    method: "DELETE",
+    method: 'DELETE',
   });
 }
 
-const RAID_INFO_PATH = "/raid-info";
+const RAID_INFO_PATH = '/raid-info';
 
 export async function getRaidInfos(): Promise<RaidSimple[]> {
-  return apiFetch<RaidSimple[]>(RAID_INFO_PATH, { method: "GET" });
+  return apiFetch<RaidSimple[]>(RAID_INFO_PATH, { method: 'GET' });
 }
 
 export async function getRaidInfoDetail(raidId: number): Promise<RaidDetail> {
-  return apiFetch<RaidDetail>(`${RAID_INFO_PATH}/${raidId}`, { method: "GET" });
+  return apiFetch<RaidDetail>(`${RAID_INFO_PATH}/${raidId}`, { method: 'GET' });
 }
 
 export async function createCharacterWeeklyRaids(
   characterId: number,
-  payload: CreateCharacterWeeklyRaidsRequest,
+  payload: CreateCharacterWeeklyRaidsRequest
 ): Promise<void> {
   await apiFetch<unknown>(`/characters/${characterId}/weekly-raids`, {
-    method: "POST",
+    method: 'POST',
     json: payload,
   });
 }
 
 export async function putCharacterWeeklyRaids(
   characterId: number,
-  payload: PutCharacterWeeklyRaidsRequest,
+  payload: PutCharacterWeeklyRaidsRequest
 ): Promise<void> {
   await apiFetch<unknown>(`/characters/${characterId}/weekly-raids`, {
-    method: "PUT",
+    method: 'PUT',
     json: payload,
   });
 }
@@ -177,61 +183,77 @@ export async function putCharacterWeeklyRaids(
 export async function putCharacterWeeklyRaidsByRaid(
   characterId: number,
   raidInfoId: number,
-  payload: PutCharacterWeeklyRaidsRequest,
+  payload: PutCharacterWeeklyRaidsRequest
 ): Promise<void> {
   await apiFetch<unknown>(
     `/characters/${characterId}/weekly-raids/raid/${raidInfoId}`,
     {
-      method: "PUT",
+      method: 'PUT',
       json: payload,
-    },
+    }
   );
 }
 
 export async function deleteCharacterWeeklyRaidsByRaid(
   characterId: number,
-  payload: DeleteCharacterWeeklyRaidsByRaidRequest,
+  payload: DeleteCharacterWeeklyRaidsByRaidRequest
 ): Promise<void> {
   await apiFetch<unknown>(`/characters/${characterId}/weekly-raids/raid`, {
-    method: "DELETE",
+    method: 'DELETE',
     json: payload,
   });
 }
 
 export async function getCharacterWeeklyRaids(
-  characterId: number,
+  characterId: number
 ): Promise<CharacterWeeklyRaidItem[]> {
-  return apiFetch<CharacterWeeklyRaidItem[]>(`/characters/${characterId}/weekly-raids`, {
-    method: "GET",
-  });
+  return apiFetch<CharacterWeeklyRaidItem[]>(
+    `/characters/${characterId}/weekly-raids`,
+    {
+      method: 'GET',
+    }
+  );
 }
 
 export async function patchCharacterWeeklyRaidClear(
   id: number,
-  isCleared: boolean,
+  isCleared: boolean
 ): Promise<void> {
   await apiFetch<unknown>(`/characters/weekly-raids/${id}/clear`, {
-    method: "PATCH",
+    method: 'PATCH',
     json: { isCleared },
   });
 }
 
 export async function patchCharacterWeeklyRaid(
   id: number,
-  payload: UpdateCharacterWeeklyRaidRequest,
+  payload: UpdateCharacterWeeklyRaidRequest
 ): Promise<void> {
   await apiFetch<unknown>(`/characters/weekly-raids/${id}`, {
-    method: "PATCH",
+    method: 'PATCH',
     json: payload,
   });
 }
 
 export async function patchCharacterWeeklyRaidsOrder(
   characterId: number,
-  payload: PatchCharacterWeeklyRaidsOrderRequest,
+  payload: PatchCharacterWeeklyRaidsOrderRequest
 ): Promise<void> {
   await apiFetch<unknown>(`/characters/${characterId}/weekly-raids/order`, {
-    method: "PATCH",
+    method: 'PATCH',
     json: payload,
   });
+}
+
+export type AdminResetWeeklyRaidResponse = {
+  affected: number;
+};
+
+export async function resetWeeklyRaidHomeworksByAdmin(): Promise<AdminResetWeeklyRaidResponse> {
+  return apiFetch<AdminResetWeeklyRaidResponse>(
+    '/character-weekly-raid-gates/admin/reset-weekly-raids',
+    {
+      method: 'POST',
+    }
+  );
 }

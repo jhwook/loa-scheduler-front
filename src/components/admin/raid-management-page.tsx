@@ -9,6 +9,7 @@ import {
   deleteRaidGate,
   getAdminRaids,
   patchAdminRaidOrder,
+  resetWeeklyRaidHomeworksByAdmin,
   getRaidGatesByRaidId,
   updateRaid,
   updateRaidGate,
@@ -33,6 +34,13 @@ import { RaidGateList } from "./raid-gate-list";
 import { RaidList } from "./raid-list";
 
 export function RaidManagementPage() {
+  type WeeklyResetLogItem = {
+    id: number;
+    kind: "success" | "error";
+    text: string;
+    createdAt: string;
+  };
+
   const [raids, setRaids] = useState<RaidInfo[]>([]);
   const [selectedRaidId, setSelectedRaidId] = useState<number | null>(null);
   const [gates, setGates] = useState<RaidGateInfo[]>([]);
@@ -50,6 +58,10 @@ export function RaidManagementPage() {
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [editingRaid, setEditingRaid] = useState<RaidInfo | null>(null);
   const [editingGate, setEditingGate] = useState<RaidGateInfo | null>(null);
+  const [weeklyResetConfirmOpen, setWeeklyResetConfirmOpen] = useState(false);
+  const [weeklyResetPending, setWeeklyResetPending] = useState(false);
+  const [weeklyResetLastAt, setWeeklyResetLastAt] = useState<string | null>(null);
+  const [weeklyResetLogs, setWeeklyResetLogs] = useState<WeeklyResetLogItem[]>([]);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -347,15 +359,119 @@ export function RaidManagementPage() {
     }
   }
 
+  function appendWeeklyResetLog(kind: "success" | "error", text: string) {
+    setWeeklyResetLogs((prev) => {
+      const next: WeeklyResetLogItem = {
+        id: Date.now(),
+        kind,
+        text,
+        createdAt: new Date().toISOString(),
+      };
+      return [next, ...prev].slice(0, 5);
+    });
+  }
+
+  function formatDateTimeDisplay(iso: string): string {
+    return new Date(iso).toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  }
+
+  async function handleConfirmWeeklyReset() {
+    if (weeklyResetPending) return;
+    setWeeklyResetPending(true);
+    setMessage(null);
+    try {
+      const res = await resetWeeklyRaidHomeworksByAdmin();
+      const successText = `초기화 완료 (${res.affected}건 처리됨)`;
+      const nowIso = new Date().toISOString();
+      setWeeklyResetLastAt(nowIso);
+      appendWeeklyResetLog("success", successText);
+      setMessage({ type: "success", text: successText });
+      setWeeklyResetConfirmOpen(false);
+    } catch (err) {
+      let text = "초기화에 실패했습니다.";
+      if (err instanceof ApiError) {
+        text = `서버 오류(${err.status}): ${err.message}`;
+      } else if (err instanceof TypeError) {
+        text = "네트워크 오류로 초기화에 실패했습니다. 연결 상태를 확인해 주세요.";
+      } else if (err instanceof Error) {
+        text = err.message;
+      }
+      appendWeeklyResetLog("error", text);
+      setMessage({ type: "error", text });
+    } finally {
+      setWeeklyResetPending(false);
+    }
+  }
+
   return (
     <div className="space-y-4 text-base-content">
-      <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-base font-semibold text-base-content">
           레이드 관리
         </h2>
-        <p className="mt-1 text-sm text-base-content/60">
-          레이드·관문 정보를 등록하고 활성화합니다.
+        <button
+          type="button"
+          className="btn btn-warning btn-sm"
+          onClick={() => setWeeklyResetConfirmOpen(true)}
+          disabled={weeklyResetPending}
+        >
+          {weeklyResetPending ? (
+            <>
+              <span className="loading loading-spinner loading-xs" />
+              초기화 진행 중...
+            </>
+          ) : (
+            "주간 레이드 초기화"
+          )}
+        </button>
+      </div>
+      <p className="mt-1 text-sm text-base-content/60">
+        레이드·관문 정보를 등록하고 활성화합니다.
+      </p>
+
+      <div className="rounded-xl border border-warning/40 bg-warning/10 p-3">
+        <p className="text-sm font-medium text-base-content">
+          주간 레이드 숙제 초기화 (관리자 수동 실행)
         </p>
+        <p className="mt-1 text-xs text-base-content/70">
+          스케줄 실행 실패 시 전체 유저의 주간 레이드 숙제를 수동으로 초기화합니다.
+        </p>
+        <p className="mt-2 text-xs text-base-content/70">
+          마지막 초기화 시간:{" "}
+          <span className="font-medium text-base-content">
+            {weeklyResetLastAt ? formatDateTimeDisplay(weeklyResetLastAt) : "기록 없음"}
+          </span>
+        </p>
+        <div className="mt-3">
+          <p className="text-xs font-medium text-base-content/80">최근 실행 로그</p>
+          {weeklyResetLogs.length === 0 ? (
+            <p className="mt-1 text-xs text-base-content/60">아직 실행 이력이 없습니다.</p>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {weeklyResetLogs.map((log) => (
+                <li key={log.id} className="text-xs text-base-content/80">
+                  [{formatDateTimeDisplay(log.createdAt)}]{" "}
+                  <span
+                    className={
+                      log.kind === "success" ? "text-success font-medium" : "text-error font-medium"
+                    }
+                  >
+                    {log.kind === "success" ? "성공" : "실패"}
+                  </span>{" "}
+                  - {log.text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       {message ? (
@@ -441,6 +557,49 @@ export function RaidManagementPage() {
         onClose={() => setEditingRaid(null)}
         onSubmit={handleUpdateRaid}
       />
+
+      <dialog className={`modal ${weeklyResetConfirmOpen ? "modal-open" : ""}`}>
+        <div className="modal-box">
+          <h3 className="text-lg font-bold">주간 레이드 숙제 초기화</h3>
+          <p className="py-3 text-sm">
+            전체 유저의 주간 레이드 숙제가 초기화됩니다. 진행하시겠습니까?
+          </p>
+          <div className="modal-action">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setWeeklyResetConfirmOpen(false)}
+              disabled={weeklyResetPending}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className="btn btn-error"
+              onClick={() => void handleConfirmWeeklyReset()}
+              disabled={weeklyResetPending}
+            >
+              {weeklyResetPending ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  초기화 진행 중...
+                </>
+              ) : (
+                "확인"
+              )}
+            </button>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button
+            type="button"
+            onClick={() => setWeeklyResetConfirmOpen(false)}
+            disabled={weeklyResetPending}
+          >
+            close
+          </button>
+        </form>
+      </dialog>
     </div>
   );
 }
