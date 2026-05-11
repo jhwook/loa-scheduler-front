@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -24,7 +30,10 @@ import { getClassIconSrc, resolveClassIconBasename } from '@/lib/class-icon';
 import { ApiError } from '@/types/api';
 import type { MySavedCharacter, PartyRole } from '@/types/expedition';
 import { normalizePartyRole } from '@/types/expedition';
-import type { CharacterWeeklyRaidItem } from '@/types/raid';
+import type {
+  CharacterWeeklyRaidItem,
+  PatchCharacterWeeklyRaidsOrderRequest,
+} from '@/types/raid';
 
 type Props = {
   character: MySavedCharacter;
@@ -63,6 +72,77 @@ function parseRaidIdFromSortableId(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** weeklyRaids 행 순서대로 처음 등장하는 raidInfo.id 목록 (서버 배열 순서 반영) */
+function raidInfoIdsInServerRowOrder(rows: CharacterWeeklyRaidItem[]): number[] {
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const row of rows) {
+    const raidInfoId = row.raidGateInfo.raidInfo.id;
+    if (!seen.has(raidInfoId)) {
+      seen.add(raidInfoId);
+      out.push(raidInfoId);
+    }
+  }
+  return out;
+}
+
+/** 동일 데이터인데 배열 참조만 바뀐 리렌더에서 순서 state가 리셋되지 않도록 구분 */
+function weeklyRaidsPropSyncKey(rows: CharacterWeeklyRaidItem[]): string {
+  if (rows.length === 0) return '__empty__';
+  return rows
+    .map((r, i) => `${i}:${r.id}:${r.raidGateInfo.raidInfo.id}`)
+    .join('|');
+}
+
+const PERSISTED_RAID_ORDER_PREFIX = 'expedition-weekly-raid-order:';
+
+function loadPersistedRaidOrder(characterId: number): number[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(
+      `${PERSISTED_RAID_ORDER_PREFIX}${characterId}`
+    );
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    const ids = parsed.filter(
+      (x): x is number => typeof x === 'number' && Number.isFinite(x)
+    );
+    return ids.length > 0 ? ids : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedRaidOrder(characterId: number, order: number[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      `${PERSISTED_RAID_ORDER_PREFIX}${characterId}`,
+      JSON.stringify(order)
+    );
+  } catch {
+    /* 저장 실패 무시 (사파리 비공개 등) */
+  }
+}
+
+/**
+ * 새로고침/외부 동기화 후에도 PATCH로 저장해 둔 raidInfoId 순서를 유지한다.
+ * API가 weeklyRaids 행을 기본 정렬로만 내려줘도 UI 순서가 풀리지 않게 한다.
+ */
+function mergePersistedRaidOrderWithServer(
+  serverRows: CharacterWeeklyRaidItem[],
+  persisted: number[] | null
+): number[] {
+  const serverOrder = raidInfoIdsInServerRowOrder(serverRows);
+  if (!persisted?.length) return serverOrder;
+
+  const serverSet = new Set(serverOrder);
+  const kept = persisted.filter((id) => serverSet.has(id));
+  const tail = serverOrder.filter((id) => !kept.includes(id));
+  return [...kept, ...tail];
+}
+
 function SortableRaidGroup({
   raidId,
   disabled,
@@ -74,11 +154,17 @@ function SortableRaidGroup({
   className: string;
   children: ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: raidGroupSortableId(raidId),
-      disabled,
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: raidGroupSortableId(raidId),
+    disabled,
+  });
 
   return (
     <div
@@ -202,6 +288,8 @@ export function ExpeditionCharacterCard({
   const animatedCurrentClearGoldRef = useRef(0);
   const [raidOrderIds, setRaidOrderIds] = useState<number[]>([]);
   const [raidOrderSaving, setRaidOrderSaving] = useState(false);
+  /** 부모가 같은 내용으로 새 배열 참조만 넘길 때 raidOrderIds가 서버 순으로 덮어쓰이지 않게 함 */
+  const weeklyRaidsPropSyncKeyRef = useRef<string | null>(null);
   const dndSensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -284,8 +372,17 @@ export function ExpeditionCharacterCard({
   }
 
   useEffect(() => {
+    const key = weeklyRaidsPropSyncKey(weeklyRaidsProp);
+    if (weeklyRaidsPropSyncKeyRef.current === key) return;
+    weeklyRaidsPropSyncKeyRef.current = key;
     setWeeklyRaids(weeklyRaidsProp);
-  }, [weeklyRaidsProp]);
+    setRaidOrderIds(
+      mergePersistedRaidOrderWithServer(
+        weeklyRaidsProp,
+        loadPersistedRaidOrder(c.id)
+      )
+    );
+  }, [weeklyRaidsProp, c.id]);
 
   const raidGroups = useMemo<WeeklyRaidGroup[]>(() => {
     const map = new Map<string, WeeklyRaidGroup>();
@@ -299,23 +396,9 @@ export function ExpeditionCharacterCard({
       prev.items.push(row);
       map.set(raidName, prev);
     }
-    return [...map.values()]
-      .map((g) => ({
-        ...g,
-        items: [...g.items].sort(
-          (a, b) => a.raidGateInfo.gateNumber - b.raidGateInfo.gateNumber
-        ),
-      }));
+    // 서버가 내려준 weeklyRaids 행 순서 유지 (레이드 블록·관문 모두 재정렬하지 않음)
+    return [...map.values()];
   }, [weeklyRaids]);
-
-  useEffect(() => {
-    const canonicalIds = raidGroups.map((g) => g.raidId);
-    setRaidOrderIds((prev) => {
-      const kept = prev.filter((id) => canonicalIds.includes(id));
-      const missing = canonicalIds.filter((id) => !kept.includes(id));
-      return [...kept, ...missing];
-    });
-  }, [raidGroups]);
 
   const orderedRaidGroups = useMemo(() => {
     const map = new Map(raidGroups.map((g) => [g.raidId, g] as const));
@@ -326,18 +409,25 @@ export function ExpeditionCharacterCard({
     return raidGroups;
   }, [raidGroups, raidOrderIds]);
 
-  async function persistRaidOrder(next: number[], before: number[]) {
+  async function persistRaidOrder(
+    nextRaidInfoIds: number[],
+    rollbackRaidInfoIds: number[]
+  ) {
+    const payload: PatchCharacterWeeklyRaidsOrderRequest = {
+      raidOrders: nextRaidInfoIds.map((raidInfoId, index) => ({
+        raidInfoId,
+        orderNo: index + 1,
+      })),
+    };
+    console.log('[raid order payload]', payload);
+
     setRaidOrderSaving(true);
     try {
-      await patchCharacterWeeklyRaidsOrder(c.id, {
-        raidOrders: next.map((raidInfoId, index) => ({
-          raidInfoId,
-          orderNo: index + 1,
-        })),
-      });
+      await patchCharacterWeeklyRaidsOrder(c.id, payload);
+      savePersistedRaidOrder(c.id, nextRaidInfoIds);
       reloadDashboard();
     } catch {
-      setRaidOrderIds(before);
+      setRaidOrderIds(rollbackRaidInfoIds);
     } finally {
       setRaidOrderSaving(false);
     }
@@ -352,15 +442,17 @@ export function ExpeditionCharacterCard({
     const overRaidId = parseRaidIdFromSortableId(String(over.id));
     if (activeRaidId == null || overRaidId == null) return;
 
-    const before =
-      raidOrderIds.length > 0 ? raidOrderIds : raidGroups.map((g) => g.raidId);
-    const oldIndex = before.indexOf(activeRaidId);
-    const newIndex = before.indexOf(overRaidId);
+    // 화면에 그려진 순서(derived) 기준 — raidOrderIds 단독 사용 시 stale / 불일치 방지
+    const beforeRaidInfoIds = orderedRaidGroups.map((g) => g.raidId);
+    const oldIndex = beforeRaidInfoIds.indexOf(activeRaidId);
+    const newIndex = beforeRaidInfoIds.indexOf(overRaidId);
     if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
 
-    const next = arrayMove(before, oldIndex, newIndex);
-    setRaidOrderIds(next);
-    void persistRaidOrder(next, before);
+    const nextRaidInfoIds = arrayMove(beforeRaidInfoIds, oldIndex, newIndex);
+
+    // 낙관적 업데이트: API보다 먼저 UI 순서 반영 (setState 배치와 무관하게 payload는 nextRaidInfoIds 사용)
+    setRaidOrderIds(nextRaidInfoIds);
+    void persistRaidOrder(nextRaidInfoIds, beforeRaidInfoIds);
   }
 
   const totalGold = useMemo(
@@ -413,7 +505,10 @@ export function ExpeditionCharacterCard({
         row.extraRewardCostSnapshot ?? row.raidGateInfo.extraRewardCost ?? 0;
       return acc + Math.max(0, extraCost);
     }, 0);
-    const remain = Math.max(0, clearGoldProgress.total - clearGoldProgress.current);
+    const remain = Math.max(
+      0,
+      clearGoldProgress.total - clearGoldProgress.current
+    );
     const amount = Math.min(remain, selectedExtraAmount);
     return {
       amount,
@@ -483,7 +578,9 @@ export function ExpeditionCharacterCard({
     );
     try {
       await Promise.all(
-        affectedIds.map((id) => patchCharacterWeeklyRaidClear(id, nextIsCleared))
+        affectedIds.map((id) =>
+          patchCharacterWeeklyRaidClear(id, nextIsCleared)
+        )
       );
     } catch {
       setWeeklyRaids(prevRows);
@@ -607,9 +704,7 @@ export function ExpeditionCharacterCard({
                 classMark
               )}
             </div>
-            {partyRole === 'SUPPORT' ? (
-              <SupporterRoleMark size="md" />
-            ) : null}
+            {partyRole === 'SUPPORT' ? <SupporterRoleMark size="md" /> : null}
           </div>
           <div className="min-w-0 flex-1">
             <div
@@ -806,82 +901,84 @@ export function ExpeditionCharacterCard({
                       key={group.raidId}
                       raidId={group.raidId}
                       disabled={raidOrderSaving}
-                      className={idx === 0 ? '' : 'border-t border-base-300 pt-3'}
+                      className={
+                        idx === 0 ? '' : 'border-t border-base-300 pt-3'
+                      }
                     >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-[clamp(11px,0.9vw,13px)] font-semibold text-base-content">
-                          {group.raidName}
-                        </p>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-xs min-h-0 h-6 w-6 shrink-0 p-0 text-base-content/80"
-                          onClick={() => {
-                            setEditModalRaidId(group.raidId);
-                            setEditModalRaidName(group.raidName);
-                          }}
-                          aria-label={`${group.raidName} 설정`}
-                        >
-                          <span className="text-lg leading-none">⚙</span>
-                        </button>
-                      </div>
-                      <p className="mt-0.5 text-[clamp(15px,1.3vw,20px)] leading-none text-amber-300">
-                        <span className="text-[clamp(14px,1.15vw,18px)] font-bold">
-                          {group.items
-                            .reduce((acc, row) => {
-                              const base =
-                                row.raidGateInfo.rewardGold +
-                                row.raidGateInfo.boundGold;
-                              const extraCost = row.isExtraRewardSelected
-                                ? (row.extraRewardCostSnapshot ??
-                                  row.raidGateInfo.extraRewardCost ??
-                                  0)
-                                : 0;
-                              return acc + Math.max(0, base - extraCost);
-                            }, 0)
-                            .toLocaleString()}
-                        </span>
-                        <span className="ml-1 text-[clamp(10px,0.8vw,11px)]">
-                          G
-                        </span>
-                      </p>
-                    </div>
-                    <div className="flex items-end gap-1.5">
-                      {group.items.map((row) => (
-                        <div
-                          key={row.id}
-                          className="flex w-12 flex-col items-center gap-1"
-                        >
-                          <span
-                            className={`badge border h-4 min-h-4 rounded-md px-1 text-[8px] leading-none ${difficultyBadgeClass(
-                              row.raidGateInfo.difficulty
-                            )}`}
-                          >
-                            {row.raidGateInfo.difficulty}
-                          </span>
-                          <button
-                            type="button"
-                            className={`indicator relative flex h-10 w-10 items-center justify-center rounded-md border text-[clamp(13px,1vw,16px)] font-semibold ${
-                              row.isCleared
-                                ? 'border-emerald-500 bg-emerald-900/40 text-emerald-200'
-                                : 'border-base-300 bg-base-300 text-base-content'
-                            } ${pendingClearIds.has(row.id) ? 'opacity-60' : ''}`}
-                            onClick={() => void toggleClear(row)}
-                            disabled={pendingClearIds.has(row.id)}
-                            aria-label={`${group.raidName} ${row.raidGateInfo.gateNumber}관문 클리어 토글`}
-                          >
-                            {row.raidGateInfo.gateNumber}
-                            {row.isExtraRewardSelected ? (
-                              <span className="badge badge-xs badge-outline indicator-item border-emerald-500 bg-base-200 px-1.5 text-[10px] leading-none text-emerald-400">
-                                +
-                              </span>
-                            ) : null}
-                          </button>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-[clamp(11px,0.9vw,13px)] font-semibold text-base-content">
+                              {group.raidName}
+                            </p>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs min-h-0 h-6 w-6 shrink-0 p-0 text-base-content/80"
+                              onClick={() => {
+                                setEditModalRaidId(group.raidId);
+                                setEditModalRaidName(group.raidName);
+                              }}
+                              aria-label={`${group.raidName} 설정`}
+                            >
+                              <span className="text-lg leading-none">⚙</span>
+                            </button>
+                          </div>
+                          <p className="mt-0.5 text-[clamp(15px,1.3vw,20px)] leading-none text-amber-300">
+                            <span className="text-[clamp(14px,1.15vw,18px)] font-bold">
+                              {group.items
+                                .reduce((acc, row) => {
+                                  const base =
+                                    row.raidGateInfo.rewardGold +
+                                    row.raidGateInfo.boundGold;
+                                  const extraCost = row.isExtraRewardSelected
+                                    ? (row.extraRewardCostSnapshot ??
+                                      row.raidGateInfo.extraRewardCost ??
+                                      0)
+                                    : 0;
+                                  return acc + Math.max(0, base - extraCost);
+                                }, 0)
+                                .toLocaleString()}
+                            </span>
+                            <span className="ml-1 text-[clamp(10px,0.8vw,11px)]">
+                              G
+                            </span>
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        <div className="flex items-end gap-1.5">
+                          {group.items.map((row) => (
+                            <div
+                              key={row.id}
+                              className="flex w-12 flex-col items-center gap-1"
+                            >
+                              <span
+                                className={`badge border h-4 min-h-4 rounded-md px-1 text-[8px] leading-none ${difficultyBadgeClass(
+                                  row.raidGateInfo.difficulty
+                                )}`}
+                              >
+                                {row.raidGateInfo.difficulty}
+                              </span>
+                              <button
+                                type="button"
+                                className={`indicator relative flex h-10 w-10 items-center justify-center rounded-md border text-[clamp(13px,1vw,16px)] font-semibold ${
+                                  row.isCleared
+                                    ? 'border-emerald-500 bg-emerald-900/40 text-emerald-200'
+                                    : 'border-base-300 bg-base-300 text-base-content'
+                                } ${pendingClearIds.has(row.id) ? 'opacity-60' : ''}`}
+                                onClick={() => void toggleClear(row)}
+                                disabled={pendingClearIds.has(row.id)}
+                                aria-label={`${group.raidName} ${row.raidGateInfo.gateNumber}관문 클리어 토글`}
+                              >
+                                {row.raidGateInfo.gateNumber}
+                                {row.isExtraRewardSelected ? (
+                                  <span className="badge badge-xs badge-outline indicator-item border-emerald-500 bg-base-200 px-1.5 text-[10px] leading-none text-emerald-400">
+                                    +
+                                  </span>
+                                ) : null}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </SortableRaidGroup>
                   ))}
                 </SortableContext>
@@ -899,7 +996,9 @@ export function ExpeditionCharacterCard({
                     <span>{totalGold.bound.toLocaleString()} G</span>
                   </span>
                   <span className="text-base-content/60">/</span>
-                  <span>{(totalGold.bound + totalGold.normal).toLocaleString()} G</span>
+                  <span>
+                    {(totalGold.bound + totalGold.normal).toLocaleString()} G
+                  </span>
                 </div>
               </div>
             </div>

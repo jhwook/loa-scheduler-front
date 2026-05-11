@@ -25,7 +25,7 @@ export function normalizeRaidPartySize(value: unknown): RaidPartySize {
 }
 
 export function formatRaidPartySizeLabel(size: RaidPartySize): string {
-  return size === 4 ? "4인" : "8인";
+  return size === 4 ? '4인' : '8인';
 }
 
 export type RaidInfo = {
